@@ -40,4 +40,4 @@
 - [x] 4.1 Coherencia triple AC↔specs↔tests (coherence-three-way) sin huecos
 - [x] 4.2 Verificación adversarial de cableado (wiring-adversarial-verifier) → `wiring_verified=true`
 - [x] 4.3 DoD reducido (dor-dod-gatekeeper) → `dod=true`
-- [ ] 4.4 PR + `opsx:archive` del change en el mismo PR
+- [x] 4.4 PR + `opsx:archive` del change en el mismo PR
