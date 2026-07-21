@@ -33,3 +33,5 @@ Contexto: complementa el failover básico (HU-004a). Separa la política de time
 ## Notas técnicas
 
 El TTFT externo (del proveedor) no incluye el overhead del Guardián de Prompts. Los valores viven en el YAML por modelo/capacidad.
+
+> **OpenSpec change**: `ep-002-resiliencia-conectividad` (EP-002)

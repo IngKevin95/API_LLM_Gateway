@@ -33,3 +33,5 @@ Contexto: complementa el failover básico (HU-004a). El Max In-Flight es configu
 ## Notas técnicas
 
 Max In-Flight declarativo por proveedor en YAML (no hardcodeado). El fast-fail preserva el SLA de 0 I/O de la capa determinista.
+
+> **OpenSpec change**: `ep-002-resiliencia-conectividad` (EP-002)

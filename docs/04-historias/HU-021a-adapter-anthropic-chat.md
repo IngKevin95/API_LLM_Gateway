@@ -35,3 +35,5 @@ Contexto: la API de Anthropic difiere de OpenAI (headers propios, `system` separ
 ## Notas técnicas
 
 Cuidado con la conversión de roles y mensajes alternados (User/Assistant) que Anthropic exige de forma estricta.
+
+> **OpenSpec change**: `ep-002-resiliencia-conectividad` (EP-002)

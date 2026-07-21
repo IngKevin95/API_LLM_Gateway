@@ -33,3 +33,5 @@ Contexto: depende de HU-020a (chat base). Aísla la mecánica de streaming del a
 ## Notas técnicas
 
 Reutiliza la traducción de HU-020a; solo añade el manejo del canal SSE y del idle timeout.
+
+> **OpenSpec change**: `ep-002-resiliencia-conectividad` (EP-002)

@@ -33,3 +33,5 @@ Contexto: depende de HU-021a (chat base). Aísla la transformación de eventos d
 ## Notas técnicas
 
 Mapear el ciclo `message_start` → `content_block_delta` → `message_stop` al esquema de chunks OpenAI.
+
+> **OpenSpec change**: `ep-002-resiliencia-conectividad` (EP-002)

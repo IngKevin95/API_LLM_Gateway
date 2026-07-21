@@ -46,6 +46,7 @@ Fuente: `docs/01-prd/api-llm-gateway.md`. Objetivos del PRD:
 |---|---|
 | Objetivo(s) del PRD cubiertos | Obj. 2 |
 | Capa (build) | foundational |
+| OpenSpec change | ep-002-resiliencia-conectividad |
 | Métrica de éxito | Ante 429/500/timeout del primario la petición se completa por el siguiente de la cadena; éxito ≥ 99% con ≥1 proveedor sano |
 
 **De qué se trata**: Failover transparente en cadena ordenada por capacidad, más Health Monitor que mide disponibilidad/latencia/throughput/errores y retira o reactiva proveedores automáticamente. Último eslabón: modelos locales (Ollama/vLLM/LM Studio).
