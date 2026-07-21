@@ -33,3 +33,5 @@ Contexto: depende de HU-020a (chat base). Aísla la ruta de embeddings.
 ## Notas técnicas
 
 Comparte cliente HTTP y manejo de errores con HU-020a.
+
+> **OpenSpec change**: `ep-002-resiliencia-conectividad` (EP-002)

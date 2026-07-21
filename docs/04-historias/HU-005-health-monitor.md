@@ -35,3 +35,5 @@ Contexto: convierte el failover reactivo (HU-004) en prevención proactiva. Acti
 ## Notas técnicas
 
 Intervalo configurable (p.ej. 60 s). Histéresis para intermitencia. Estado consultable por el Router.
+
+> **OpenSpec change**: `ep-002-resiliencia-conectividad` (EP-002)

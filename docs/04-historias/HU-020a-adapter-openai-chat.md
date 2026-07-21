@@ -33,3 +33,5 @@ Contexto: adapter base que heredarán proveedores compatibles con OpenAI (vLLM, 
 ## Notas técnicas
 
 Modelo base para adapters OpenAI-compat. El streaming (020b) y embeddings (020c) reutilizan esta traducción.
+
+> **OpenSpec change**: `ep-002-resiliencia-conectividad` (EP-002)

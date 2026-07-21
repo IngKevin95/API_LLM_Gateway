@@ -35,3 +35,5 @@ Contexto: resiliencia del producto. Cadena de fallback ordenada por capacidad, t
 ## Notas técnicas
 
 Límite de intentos por cadena para evitar bucles; respetar timeouts por proveedor. El fallo mid-stream se reporta al cliente (no hay failover transparente mid-stream) y penaliza el score.
+
+> **OpenSpec change**: `ep-002-resiliencia-conectividad` (EP-002)
