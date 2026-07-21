@@ -1,3 +1,28 @@
+# Project-specific
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets and credentials
+.env
+.env.local
+*.pem
+*.key
+secrets.yaml
+
+# Node.js (for build tooling)
+node_modules/
+npm-debug.log
+yarn-error.log
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -216,3 +241,25 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ── factory-vertical (auto) ───────────────────────────
+.claude/skills/factory/
+.claude/agents/factory/
+.claude/commands/factory/
+.claude/hooks/factory.json
+.claude/.factory-version
+docs/.reviews/
+docs/.flow-state.json
+docs/.factory-suggestions.md
+# ── /factory-vertical ─────────────────────────────────
+
+# ── factory-arch-vertical (auto) ───────────────────────
+.claude/skills/factory-arch/
+.claude/agents/factory-arch/
+.claude/commands/factory-arch/
+.claude/hooks/arch.json
+.claude/.arch-version
+docs/.reviews/
+docs/.arch-flow-state.json
+docs/.arch-suggestions.md
+# ── /factory-arch-vertical ─────────────────────────────

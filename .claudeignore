@@ -1,0 +1,61 @@
+# Claude Code ignore file — controls context inclusion for Claude Code sessions
+
+# Build artifacts
+node_modules/
+dist/
+build/
+out/
+*.o
+*.a
+*.so
+*.pyc
+__pycache__/
+*.egg-info/
+.eggs/
+
+# IDE and editor config
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git and version control
+.git/
+.gitignore
+.github/
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Temporary and cache
+.cache/
+tmp/
+temp/
+*.tmp
+.claude/sessions/
+.claude/cache/
+
+# Large generated files
+*.log
+coverage/
+*.tar.gz
+*.zip
+
+# Documentation build artifacts
+docs/_build/
+docs/.build/
+docs/.factory-suggestions.md
+
+# Test coverage
+.nyc_output/
+.coverage
+htmlcov/
+
+# Keep docs/ — needed for Factory audits
+# Keep .claude/ — needed for agent coordination
