@@ -1,0 +1,56 @@
+# config.yaml — API LLM Gateway (ejemplo de arranque, subconjunto del Anexo A del PRD técnico)
+# Secretos siempre por referencia de entorno ${VAR}, nunca literales.
+
+providers:
+  - id: openai
+    type: openai
+    base_url: https://api.openai.com/v1
+    api_key: ${OPENAI_API_KEY}
+    max_in_flight: 300
+    models:
+      - name: gpt-4o
+        capabilities: [chat, vision, reasoning]
+        quality_score: 95
+        latency_p50_ms: 800
+        cost_per_1m_tokens: 15
+        max_context_tokens: 128000
+
+  - id: anthropic
+    type: anthropic
+    base_url: https://api.anthropic.com
+    api_key: ${ANTHROPIC_API_KEY}
+    max_in_flight: 250
+    models:
+      - name: claude-opus-4
+        capabilities: [chat, reasoning, vision]
+        quality_score: 92
+        latency_p50_ms: 900
+        cost_per_1m_tokens: 20
+        max_context_tokens: 200000
+
+  - id: local-ollama
+    type: ollama
+    base_url: http://localhost:11434
+    max_in_flight: 50
+    models:
+      - name: mistral-7b
+        capabilities: [chat, coding]
+        quality_score: 70
+        latency_p50_ms: 100
+        cost_per_1m_tokens: 0
+        max_context_tokens: 32000
+
+routing:
+  capabilities:
+    chat:
+      providers: [openai, anthropic, local-ollama]
+      stream_idle_timeout_ms: 5000
+    reasoning:
+      providers: [anthropic, openai]
+      stream_idle_timeout_ms: 60000
+    vision:
+      providers: [openai, anthropic]
+      stream_idle_timeout_ms: 10000
+    coding:
+      providers: [local-ollama]
+      stream_idle_timeout_ms: 5000

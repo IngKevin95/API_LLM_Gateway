@@ -16,6 +16,8 @@ Fuente: `docs/01-prd/api-llm-gateway.md`. Objetivos del PRD:
 | Campo | Valor |
 |---|---|
 | Objetivo(s) del PRD cubiertos | Obj. 1, Obj. 3 |
+| Capa (build) | foundational |
+| OpenSpec change | enrutamiento-por-capacidad |
 | Métrica de éxito | Agente pide capacidad sin nombrar modelo; Router resuelve por score con overhead p95 < 100 ms (enrutamiento puro en RAM, excluye latencia externa del proveedor); 0 refs a proveedor/modelo en el código del consumidor |
 
 **De qué se trata**: el corazón del Gateway. Registry declarativo (YAML) de providers, modelos y capacidades, más el Model Router que traduce una capacidad (`chat`, `reasoning`, `coding`, `vision`, `image`, `embedding`) al modelo óptimo según score = f(calidad, velocidad, disponibilidad, cuota restante, costo, latencia). Soporta modo automático (sin `model`) y explícito.
@@ -43,6 +45,7 @@ Fuente: `docs/01-prd/api-llm-gateway.md`. Objetivos del PRD:
 | Campo | Valor |
 |---|---|
 | Objetivo(s) del PRD cubiertos | Obj. 2 |
+| Capa (build) | foundational |
 | Métrica de éxito | Ante 429/500/timeout del primario la petición se completa por el siguiente de la cadena; éxito ≥ 99% con ≥1 proveedor sano |
 
 **De qué se trata**: Failover transparente en cadena ordenada por capacidad, más Health Monitor que mide disponibilidad/latencia/throughput/errores y retira o reactiva proveedores automáticamente. Último eslabón: modelos locales (Ollama/vLLM/LM Studio).
@@ -76,6 +79,7 @@ Fuente: `docs/01-prd/api-llm-gateway.md`. Objetivos del PRD:
 | Campo | Valor |
 |---|---|
 | Objetivo(s) del PRD cubiertos | Obj. 4 (gobernanza de cuotas) + KPI costo (Obj. 3) |
+| Capa (build) | business |
 | Métrica de éxito | Proveedor con cuota agotada se retira automáticamente; costo por petición/agente/proveedor registrado y consultable |
 
 **De qué se trata**: Quota Manager que controla **cuota acumulada** (requests/tokens por ventana temporal: minuto/día/mes) por proveedor y por clave, y corta al agotarse; registra costo por petición, agente y proveedor. *Distinción con EP-004A*: EP-003 gestiona consumo acumulado por ventana; el **rate limiting** vive en EP-004A.
@@ -98,6 +102,7 @@ Fuente: `docs/01-prd/api-llm-gateway.md`. Objetivos del PRD:
 | Campo | Valor |
 |---|---|
 | Objetivo(s) del PRD cubiertos | Obj. 4 |
+| Capa (build) | foundational |
 | Métrica de éxito | 100% de peticiones autenticadas + autorizadas por scope |
 
 **De qué se trata**: AuthN (API key / OAuth2-OIDC / mTLS), AuthZ por scope/RBAC y por tenant con aislamiento multi-tenant, rate limiting, y prevención de abuso a nivel red.
@@ -124,6 +129,7 @@ Fuente: `docs/01-prd/api-llm-gateway.md`. Objetivos del PRD:
 | Campo | Valor |
 |---|---|
 | Objetivo(s) del PRD cubiertos | Obj. 4 |
+| Capa (build) | business |
 | Métrica de éxito | 0 secretos en logs/config versionada; auditoría inmutable completa |
 
 **De qué se trata**: Gestión de secretos (env/secret manager, rotación, multi-key legítimo), guardrails contra exfiltración/DLP, y auditoría inmutable con redacción de PII/secretos. TLS obligatorio; cifrado en tránsito y reposo.
@@ -150,6 +156,7 @@ Fuente: `docs/01-prd/api-llm-gateway.md`. Objetivos del PRD:
 | Campo | Valor |
 |---|---|
 | Objetivo(s) del PRD cubiertos | Obj. 5 |
+| Capa (build) | business |
 | Métrica de éxito | Un cliente OpenAI-compat y Free Claude Code (Anthropic-compat) funcionan apuntando a la Gateway; petición sin `model` enruta, con `model` usa el indicado |
 
 **De qué se trata**: exponer endpoints compatibles OpenAI (`/v1/chat/completions`, `/v1/embeddings`, `/v1/models`) y Anthropic Messages, para que la Gateway sea un LLM universal consumible por herramientas existentes sin cambios.
@@ -188,6 +195,7 @@ Fuente: `docs/01-prd/api-llm-gateway.md`. Objetivos del PRD:
 | Campo | Valor |
 |---|---|
 | Objetivo(s) del PRD cubiertos | Obj. 2, Obj. 3 (retroalimentan resiliencia y scoring) |
+| Capa (build) | business |
 | Métrica de éxito | Métricas por modelo/proveedor consultables (latencia, success_rate, tokens, quota, costo); ranking visible; pesos del score ajustables con histórico |
 
 **De qué se trata**: telemetría estructurada, métricas dinámicas por modelo/proveedor, dashboard/endpoint de ranking, y el Learning Engine que ajusta el enrutamiento con datos históricos.
@@ -214,6 +222,7 @@ Fuente: `docs/01-prd/api-llm-gateway.md`. Objetivos del PRD:
 | Campo | Valor |
 |---|---|
 | Objetivo(s) del PRD cubiertos | Obj. 2 |
+| Capa (build) | business |
 | Métrica de éxito | Proveedores de nicho integrados sin afectar el core |
 
 **De qué se trata**: Integrar modelos y proveedores adicionales más allá de los base (OpenAI, Anthropic).
@@ -233,6 +242,7 @@ Fuente: `docs/01-prd/api-llm-gateway.md`. Objetivos del PRD:
 | Campo | Valor |
 |---|---|
 | Objetivo(s) del PRD cubiertos | Obj. 4 (Auditoría y Seguridad), Obj. 2 (Resiliencia) |
+| Capa (build) | foundational |
 | Métrica de éxito | Logs de auditoría persisten de forma inmutable en PostgreSQL sin pérdida ante caída del Gateway; crash recovery restaura cuotas/auth desde WAL en < 5min; secretos nunca se loguean en plaintext |
 
 **De qué se trata**: infraestructura asincronista de fondo (Sync Worker) que:

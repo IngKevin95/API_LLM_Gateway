@@ -256,6 +256,8 @@ docs/.factory-suggestions.md
 # ── factory-arch-vertical (auto) ───────────────────────
 .claude/skills/factory-arch/
 .claude/agents/factory-arch/
+.claude/skills/arch/
+.claude/agents/arch/
 .claude/commands/factory-arch/
 .claude/hooks/arch.json
 .claude/.arch-version
@@ -263,3 +265,12 @@ docs/.reviews/
 docs/.arch-flow-state.json
 docs/.arch-suggestions.md
 # ── /factory-arch-vertical ─────────────────────────────
+
+# ── factory-build-harness (auto) ───────────────────────
+.claude/state/build-state.json
+# ── /factory-build-harness ──────────────────────
+
+# Go build artifacts
+*.exe
+gateway
+/gateway
