@@ -20,4 +20,6 @@ estado: lista
 ## Criterios de Aceptación (BDD)
 | ID | Escenario | Dado (Given) | Cuando (When) | Entonces (Then) |
 |---|---|---|---|---|
-| 1 | Petición que excede ventana | Un payload tiene 120k tokens y el modelo soporta 100k | El router intenta validar el contexto | La validación falla y el router descarta este modelo del score devolviendo 400 Bad Request si no hay fallback |
+| 1 | Petición dentro de ventana (happy) | Un payload estima 80k tokens (crudo + buffer 20% = 96k) y el modelo soporta 100k | El router valida el contexto | La validación pasa y el modelo permanece candidato, avanzando al cálculo de score |
+| 2 | Petición que excede ventana (error) | Un payload estima 120k tokens y el modelo soporta 100k | El router intenta validar el contexto | La validación falla, el router descarta este modelo del score y, si no hay fallback en la cadena, devuelve 400 Bad Request |
+| 3 | Buffer 20% empuja fuera de ventana (edge) | Un payload estima 85k tokens crudos y el modelo soporta 100k, pero el buffer de seguridad del 20% eleva la estimación a 102k | El router valida el contexto aplicando el buffer | La validación falla por buffer: el modelo se descarta aunque el conteo crudo cabría, evitando un envío al borde del límite |
