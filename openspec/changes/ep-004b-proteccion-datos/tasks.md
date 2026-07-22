@@ -20,10 +20,10 @@
 - [x] 1.. Adaptar el Sync Worker para que cifre la carga útil con KMS antes de insertar en la base de datos.
 
 ## Fase 4: DLP Asíncrono (Sub-slice 4)
-- [x] 1.. Extender el engine DLP para permitir lectura streaming asíncrona.
-- [x] 1.. Modificar el adaptador upstream para envolver el body response y ejecutar kill-switch (cancel context) si detecta PII en vuelo.
-- [x] 1.. Realizar pruebas integrales para validar que la conexión TCP de cliente se corta abruptamente.
+- [x] 12. Extender el engine DLP para permitir lectura streaming asíncrona.
+- [x] 13. Modificar el adaptador upstream para envolver el body response y ejecutar kill-switch (cancel context) si detecta PII en vuelo.
+- [x] 14. Realizar pruebas integrales para validar que la conexión TCP de cliente se corta abruptamente.
 
 ## Cierre y Documentación
-- [x] 1.. Actualizar la documentación Swagger/OpenAPI con los códigos de error relacionados con DLP y timeouts (HTTP 408, 500).
-- [x] 1.. Generar el PR de EP-004B completamente documentado.
+- [x] 15. Actualizar la documentación Swagger/OpenAPI con los códigos de error relacionados con DLP y timeouts (HTTP 408, 500).
+- [x] 16. Generar el PR de EP-004B completamente documentado.
