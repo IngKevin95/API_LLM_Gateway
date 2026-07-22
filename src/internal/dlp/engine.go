@@ -2,6 +2,7 @@ package dlp
 
 import (
 	"context"
+	"io"
 	"regexp"
 )
 
@@ -42,4 +43,41 @@ func (e *Engine) Redact(ctx context.Context, payload []byte) ([]byte, error) {
 	}
 
 	return redacted, nil
+}
+
+// ScanAsync lee de manera continua (streaming) del stream. Si encuentra PII grave (emails o tarjetas)
+// en vuelo, ejecuta cancelFunc para interrumpir abruptamente la conexión TCP o petición.
+func (e *Engine) ScanAsync(ctx context.Context, stream io.Reader, cancelFunc context.CancelFunc) {
+	buf := make([]byte, 4096)
+	var window []byte
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		n, err := stream.Read(buf)
+		if n > 0 {
+			// Añadimos el nuevo chunk a la ventana actual
+			window = append(window, buf[:n]...)
+
+			// Verificamos si hay match
+			if e.emailRe.Match(window) || e.ccRe.Match(window) {
+				cancelFunc()
+				return
+			}
+
+			// Mantener un solapamiento (ej. últimos 100 bytes) para cruce de fragmentos
+			if len(window) > 100 {
+				window = window[len(window)-100:]
+			}
+		}
+
+		if err != nil {
+			// EOF o error de lectura, terminamos el escaneo
+			return
+		}
+	}
 }

@@ -2,6 +2,7 @@ package dlp
 
 import (
 	"context"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -42,6 +43,34 @@ func TestEngine_RedactCreditCards(t *testing.T) {
 	}
 	if !strings.Contains(string(gotBytes), "[REDACTED_CREDITCARD]") {
 		t.Errorf("no se encontró marcador de redacción de tarjeta: %q", string(gotBytes))
+	}
+}
+
+// AC4: ScanAsync detecta PII en stream y cancela el contexto
+func TestEngine_ScanAsync_KillSwitch(t *testing.T) {
+	eng := NewEngine()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Stream que emite fragmentos lentamente
+	pr, pw := io.Pipe()
+	go func() {
+		pw.Write([]byte("Todo normal hasta aqui... "))
+		time.Sleep(10 * time.Millisecond)
+		pw.Write([]byte("y de repente... 1234-"))
+		time.Sleep(10 * time.Millisecond)
+		pw.Write([]byte("5678-9012-3456 ups"))
+		pw.Close()
+	}()
+
+	// Llamada asíncrona a ScanAsync
+	go eng.ScanAsync(ctx, pr, cancel)
+
+	select {
+	case <-ctx.Done():
+		// Éxito, el kill-switch funcionó
+	case <-time.After(1 * time.Second):
+		t.Fatal("el kill switch no fue gatillado")
 	}
 }
 
