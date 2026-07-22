@@ -44,7 +44,7 @@ func TestIntegration_FullStack_HealthAndBreaker(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "sk-x")
 	t.Setenv("ANTHROPIC_API_KEY", "sk-y")
 
-	reg, err := registry.Load(filepath.Join("..", "..", "config.yaml"))
+	reg, err := registry.Load(filepath.Join("..", "..", "config.yaml"), nil)
 	if err != nil {
 		t.Fatalf("cargar config: %v", err)
 	}
