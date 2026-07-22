@@ -25,6 +25,9 @@ type Adapter struct {
 	StreamIdle time.Duration
 	// MaxBatch es el tope de textos por petición de embeddings; 0 usa el default.
 	MaxBatch int
+	// ExtraHeaders son headers adicionales que se inyectan en cada request HTTP.
+	// Usado por wrappers (ej. OpenRouter) que requieren headers propios.
+	ExtraHeaders map[string]string
 }
 
 const defaultMaxBatch = 2048
@@ -159,6 +162,9 @@ func (a *Adapter) post(ctx context.Context, path string, payload any) (*http.Res
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Authorization", "Bearer "+a.apiKey)
+	for k, v := range a.ExtraHeaders {
+		httpReq.Header.Set(k, v)
+	}
 
 	resp, err := a.client.Do(httpReq)
 	if err != nil {
