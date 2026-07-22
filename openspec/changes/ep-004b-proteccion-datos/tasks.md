@@ -15,7 +15,7 @@
 - [x] 8. Asegurar límite de tiempo (< 50ms) o devolver HTTP 500 en la redacción síncrona.
 
 ## Fase 3: Auditoría y Cifrado KMS (Sub-slice 3)
-- [ ] 9. Crear esquema de PostgreSQL en `sql/04_auditlog.sql` con tabla `AuditLog` particionada y trigger para evitar UPDATE/DELETE.
+- [x] 9. Crear esquema de PostgreSQL en `sql/04_auditlog.sql` con tabla `AuditLog` particionada y trigger para evitar UPDATE/DELETE.
 - [x] 1.. Implementar abstracción `internal/audit/kms.go` (Client-Side Encryption en memoria).
 - [x] 1.. Adaptar el Sync Worker para que cifre la carga útil con KMS antes de insertar en la base de datos.
 
