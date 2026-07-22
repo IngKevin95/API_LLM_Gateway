@@ -12,6 +12,7 @@ import (
 // Processor maneja la lógica de negocio subyacente.
 type Processor interface {
 	ProcessChat(ctx context.Context, req *adapter.Request) (*adapter.Response, error)
+	ProcessChatStream(ctx context.Context, req *adapter.Request) (adapter.TokenStream, error)
 }
 
 // Handler HTTP para los endpoints de OpenAI.
@@ -30,7 +31,6 @@ func (h *Handler) HandleChatCompletions(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Traducir a internal request
 	internalReq := &adapter.Request{
 		Model:     req.Model,
 		MaxTokens: req.MaxTokens,
@@ -43,21 +43,22 @@ func (h *Handler) HandleChatCompletions(w http.ResponseWriter, r *http.Request) 
 		})
 	}
 
-	// Procesar sincrónicamente (no streaming)
-	// Para este subslice, si stream=true, por ahora fallamos o lo ignoramos.
-	// Asumimos que SS1 es solo sin streaming.
+	if req.Stream {
+		h.handleStream(w, r, internalReq, req.Model)
+		return
+	}
+
 	resp, err := h.processor.ProcessChat(r.Context(), internalReq)
 	if err != nil {
 		http.Error(w, `{"error":{"message":"Internal server error","type":"server_error"}}`, http.StatusInternalServerError)
 		return
 	}
 
-	// Convertir a respuesta OpenAI
 	openaiResp := ChatCompletionResponse{
 		ID:      "chatcmpl-mock",
 		Object:  "chat.completion",
 		Created: time.Now().Unix(),
-		Model:   req.Model, // En un caso real, el modelo real usado.
+		Model:   req.Model,
 		Choices: []Choice{
 			{
 				Index: 0,
@@ -69,7 +70,7 @@ func (h *Handler) HandleChatCompletions(w http.ResponseWriter, r *http.Request) 
 			},
 		},
 		Usage: Usage{
-			PromptTokens:     0, // TODO: usar tokenizer o info del adapter
+			PromptTokens:     0,
 			CompletionTokens: 0,
 			TotalTokens:      0,
 		},
@@ -77,4 +78,64 @@ func (h *Handler) HandleChatCompletions(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(openaiResp)
+}
+
+func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, internalReq *adapter.Request, model string) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	stream, err := h.processor.ProcessChatStream(r.Context(), internalReq)
+	if err != nil {
+		http.Error(w, `{"error":{"message":"Internal server error","type":"server_error"}}`, http.StatusInternalServerError)
+		return
+	}
+	defer stream.Close()
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	encoder := json.NewEncoder(w)
+
+	// Send initial role chunk
+	initialChunk := ChatCompletionChunk{
+		ID:      "chatcmpl-stream-mock",
+		Object:  "chat.completion.chunk",
+		Created: time.Now().Unix(),
+		Model:   model,
+		Choices: []ChunkChoice{{Index: 0, Delta: ChunkMessage{Role: "assistant"}}},
+	}
+	w.Write([]byte("data: "))
+	encoder.Encode(initialChunk)
+	w.Write([]byte("\n"))
+	flusher.Flush()
+
+	for {
+		token, ok, err := stream.Next()
+		if err != nil {
+			// In SSE, usually we just stop or send an error chunk, but OpenAI drops connection or sends error json?
+			break
+		}
+		if !ok {
+			break
+		}
+
+		chunk := ChatCompletionChunk{
+			ID:      "chatcmpl-stream-mock",
+			Object:  "chat.completion.chunk",
+			Created: time.Now().Unix(),
+			Model:   model,
+			Choices: []ChunkChoice{{Index: 0, Delta: ChunkMessage{Content: token}}},
+		}
+		w.Write([]byte("data: "))
+		encoder.Encode(chunk)
+		w.Write([]byte("\n"))
+		flusher.Flush()
+	}
+
+	w.Write([]byte("data: [DONE]\n\n"))
+	flusher.Flush()
 }

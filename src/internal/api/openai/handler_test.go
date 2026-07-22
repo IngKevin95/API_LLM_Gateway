@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
@@ -14,12 +15,35 @@ import (
 
 // mockProcessor stub for TDD
 type mockProcessor struct {
-	resp *adapter.Response
-	err  error
+	resp   *adapter.Response
+	err    error
+	stream adapter.TokenStream
 }
 
 func (m *mockProcessor) ProcessChat(ctx context.Context, req *adapter.Request) (*adapter.Response, error) {
 	return m.resp, m.err
+}
+
+func (m *mockProcessor) ProcessChatStream(ctx context.Context, req *adapter.Request) (adapter.TokenStream, error) {
+	return m.stream, m.err
+}
+
+type mockStream struct {
+	tokens []string
+	pos    int
+}
+
+func (m *mockStream) Next() (string, bool, error) {
+	if m.pos >= len(m.tokens) {
+		return "", false, nil
+	}
+	t := m.tokens[m.pos]
+	m.pos++
+	return t, true, nil
+}
+
+func (m *mockStream) Close() error {
+	return nil
 }
 
 func TestHandleChatCompletions_Success(t *testing.T) {
@@ -52,6 +76,32 @@ func TestHandleChatCompletions_Success(t *testing.T) {
 	}
 	if resp.Object != "chat.completion" {
 		t.Errorf("unexpected object: %q", resp.Object)
+	}
+}
+
+func TestHandleChatCompletions_Stream(t *testing.T) {
+	processor := &mockProcessor{
+		stream: &mockStream{tokens: []string{"Hola", ", ", "mundo"}},
+	}
+	handler := openai.NewHandler(processor)
+
+	reqBody := []byte(`{"model":"gpt-4","stream":true,"messages":[{"role":"user","content":"hola"}]}`)
+	req, _ := http.NewRequest("POST", "/v1/chat/completions", bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	handler.HandleChatCompletions(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+
+	bodyStr := rr.Body.String()
+	if !strings.Contains(bodyStr, "data: [DONE]") {
+		t.Errorf("expected [DONE] in response")
+	}
+	if !strings.Contains(bodyStr, `"content":"Hola"`) {
+		t.Errorf("expected 'Hola' in response, got %q", bodyStr)
 	}
 }
 
