@@ -31,6 +31,7 @@ func TestInvalidate_EnabledTriggersHydration(t *testing.T) {
 	}
 }
 
+// journey_smoke SS4: con flag OFF el invalidador no interfiere; poll/retry ante miss funciona.
 // HU-041 AC2 — patrón vigente en MVP: poll/retry ante miss (fail-fast + retry).
 func TestOnMiss_RehydratesWithRetry(t *testing.T) {
 	inv := &cacheinval.Invalidator{MaxRetries: 3}

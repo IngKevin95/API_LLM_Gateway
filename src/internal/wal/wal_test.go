@@ -60,6 +60,7 @@ func TestWAL_Rotation(t *testing.T) {
 	}
 }
 
+// journey_smoke SS1: escribir → rotar → recuperar end-to-end desde disco.
 // HU-039 AC2 — Error: Recover lee activo + archivados para replay.
 func TestWAL_RecoverAcrossRotations(t *testing.T) {
 	dir := t.TempDir()

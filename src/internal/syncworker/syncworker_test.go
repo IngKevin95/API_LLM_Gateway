@@ -85,6 +85,7 @@ func TestWorker_BatchesByTime(t *testing.T) {
 	waitFor(t, func() bool { return store.count() == 1 })
 }
 
+// journey_smoke SS2: worker real + WAL + Store/Encryptor mock; batch cifrado persiste.
 // HU-038 AC4 — KMS Envelope: cada evento se cifra vía Encryptor antes de persistir.
 func TestWorker_EncryptsBeforeStore(t *testing.T) {
 	store := &mockStore{}

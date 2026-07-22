@@ -84,6 +84,29 @@ func TestShutdown_FlushesBuffer(t *testing.T) {
 	}
 }
 
+// blockingStore respeta el ctx: se cuelga hasta que el ctx (timeout DB) vence.
+type blockingStore struct{}
+
+func (blockingStore) Write(ctx context.Context, _ []audit.EncryptedEvent) error {
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+// HU-040 AC5 — Prevención de deadlock: con un Store lento, el flush acotado por
+// ctx (timeout DB < shutdown) no cuelga el shutdown.
+func TestShutdown_SlowStoreNoDeadlock(t *testing.T) {
+	worker, _ := newWorker(t, blockingStore{})
+	_ = worker.Enqueue(audit.Event{ID: "e"})
+	c := shutdown.New(worker, 80*time.Millisecond)
+
+	start := time.Now()
+	c.Shutdown(context.Background())
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Errorf("shutdown se colgó con Store lento (deadlock): %s", elapsed)
+	}
+}
+
+// journey_smoke SS3: ciclo shutdown(flush) → boot(recover del WAL) end-to-end.
 // HU-040 AC4 — Recovery: boot procesa el WAL residual y lo replica al Store.
 func TestRecover_ReplaysResidualWAL(t *testing.T) {
 	store := &mockStore{}
