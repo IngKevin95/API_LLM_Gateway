@@ -236,6 +236,7 @@ Fuente: `docs/01-prd/api-llm-gateway.md`. Objetivos del PRD:
 - HU-029 — Adapter para AIHubMix
 - HU-030 — Adapter para Google (Gemini)
 - HU-031 — Adapter para OpenRouter
+- HU-036 — Adapter para OmniRoute
 
 ---
 

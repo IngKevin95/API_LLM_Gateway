@@ -50,14 +50,15 @@
 | 34 | HU-028 | Cifrado de Sobre (Envelope) en BD de Auditoría | EP-004B | Should | M | lista | 5 | HU-010 |
 | 35 | HU-030 | Adapter para Google (Gemini) | EP-008 | Should | M | lista | 4 | HU-002a |
 | 36 | HU-031 | Integrar OpenRouter API (Fallback/Long-tail) | EP-008 | Should | S | lista | 3 | HU-002a |
-| 37 | HU-027 | Guardián de Prompts (Seguridad y Jailbreak) | EP-004A | Should | M | lista | 5 | HU-002a |
-| 38 | HU-017 | Exponer métricas por modelo y proveedor | EP-007 | Could | M | lista | 4 | HU-007, HU-010 |
-| 39 | HU-023 | API de Métricas para Dashboard | EP-007 | Could | M | lista | 4 | HU-017 |
-| 40 | HU-018 | Registrar histórico de peticiones para aprendizaje | EP-007 | Could | M | lista | 4 | HU-010 |
-| 41 | HU-019 | Ajustar pesos del score con histórico (Fase 1) | EP-007 | Could | M | lista | 4 | HU-018 |
-| 42 | HU-032 | Cache Exacta (Primera Fase) | EP-007 | Could | M | lista | 4 | HU-002a |
-| 43 | HU-025b | Autenticación mTLS | EP-004A | Could | M | lista | 4 | HU-008 |
-| 44 | HU-033 | Integración MCP para multi-agentes | EP-005 | Could | M | lista | 4 | HU-002a |
+| 37 | HU-036 | Integrar OmniRoute API | EP-008 | Should | S | lista | 3 | HU-002a |
+| 38 | HU-027 | Guardián de Prompts (Seguridad y Jailbreak) | EP-004A | Should | M | lista | 5 | HU-002a |
+| 39 | HU-017 | Exponer métricas por modelo y proveedor | EP-007 | Could | M | lista | 4 | HU-007, HU-010 |
+| 40 | HU-023 | API de Métricas para Dashboard | EP-007 | Could | M | lista | 4 | HU-017 |
+| 41 | HU-018 | Registrar histórico de peticiones para aprendizaje | EP-007 | Could | M | lista | 4 | HU-010 |
+| 42 | HU-019 | Ajustar pesos del score con histórico (Fase 1) | EP-007 | Could | M | lista | 4 | HU-018 |
+| 43 | HU-032 | Cache Exacta (Primera Fase) | EP-007 | Could | M | lista | 4 | HU-002a |
+| 44 | HU-025b | Autenticación mTLS | EP-004A | Could | M | lista | 4 | HU-008 |
+| 45 | HU-033 | Integración MCP para multi-agentes | EP-005 | Could | M | lista | 4 | HU-002a |
 
 ## Trazabilidad épica → historias
 
@@ -68,18 +69,18 @@
 - **EP-004B · Protección de datos**: HU-010, HU-011, HU-026a, HU-026b, HU-028, HU-034
 - **EP-005 · API universal compatible**: HU-012a, HU-012b, HU-012c, HU-013, HU-016, HU-033
 - **EP-007 · Observabilidad y aprendizaje**: HU-017, HU-018, HU-019, HU-023, HU-032
-- **EP-008 · Adaptadores Secundarios**: HU-029, HU-030, HU-031
+- **EP-008 · Adaptadores Secundarios**: HU-029, HU-030, HU-031, HU-036
 
 ## Conteo por estado
 
 | Estado | Cantidad |
 |---|---|
-| lista | 44 |
+| lista | 45 |
 | en-curso | 0 |
 | hecha | 0 |
 | draft | 0 |
 
-Total: 44 historias (25 Must / 12 Should / 7 Could).
+Total: 45 historias (25 Must / 13 Should / 7 Could).
 
 ## Ideas sin desarrollar aún
 
