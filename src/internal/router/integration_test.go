@@ -17,7 +17,7 @@ func TestIntegration_RegistryPlusRouter_ResolvesChat(t *testing.T) {
 	t.Setenv("ANTHROPIC_API_KEY", "sk-y")
 
 	cfg := filepath.Join("..", "..", "config.yaml") // src/config.yaml desde src/internal/router
-	reg, err := registry.Load(cfg)
+	reg, err := registry.Load(cfg, nil)
 	if err != nil {
 		t.Fatalf("cargar config.yaml: %v", err)
 	}

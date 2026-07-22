@@ -272,5 +272,5 @@ docs/.arch-suggestions.md
 
 # Go build artifacts
 *.exe
-gateway
+
 /gateway

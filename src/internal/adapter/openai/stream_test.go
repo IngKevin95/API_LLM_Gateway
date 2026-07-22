@@ -3,8 +3,10 @@ package openai_test
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -99,5 +101,64 @@ func TestStream_MidStreamIdleTimeout(t *testing.T) {
 	// El proveedor dejó de emitir → el idle timeout debe cortar con error.
 	if _, _, err := ts.Next(); err == nil {
 		t.Errorf("esperaba error por Stream Idle Timeout tras el corte mid-stream")
+	}
+}
+
+// AC5: StreamScannerFunc cancela el stream cuando detecta PII
+func TestStream_ScannerKillSwitch(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher := w.(http.Flusher)
+		w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"hola \"}}]}\n\n"))
+		flusher.Flush()
+		time.Sleep(20 * time.Millisecond)
+		w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"admin@empresa.com \"}}]}\n\n"))
+		flusher.Flush()
+		time.Sleep(50 * time.Millisecond)
+		w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"mundo\"}}]}\n\n"))
+		flusher.Flush()
+	}))
+	defer srv.Close()
+
+	ad := openai.New(srv.URL, "sk-test")
+	var killed bool
+	scanner := func(ctx context.Context, stream io.Reader, cancelFunc context.CancelFunc) {
+		import_strings_and_io_if_needed := true // wait I'll add imports
+		_ = import_strings_and_io_if_needed
+		buf := make([]byte, 1024)
+		for {
+			n, err := stream.Read(buf)
+			if n > 0 && strings.Contains(string(buf[:n]), "admin@empresa.com") {
+				killed = true
+				cancelFunc()
+				return
+			}
+			if err != nil {
+				return
+			}
+		}
+	}
+
+	req := adapter.Request{Model: "gpt-4o", Stream: true, StreamScannerFunc: scanner}
+	ts, err := ad.Stream(context.Background(), req)
+	if err != nil {
+		t.Fatalf("stream start error: %v", err)
+	}
+	defer ts.Close()
+
+	tok1, ok, err := ts.Next()
+	if err != nil || !ok || tok1 != "hola " {
+		t.Errorf("esperaba hola, ok=true; obtuve %q, %v, %v", tok1, ok, err)
+	}
+
+	_, _, _ = ts.Next()
+	tok3, ok3, err3 := ts.Next()
+	if ok3 && tok3 == "mundo" {
+		t.Error("el tercer token llegó, el kill-switch no cortó la conexión a tiempo")
+	}
+	_ = err3
+
+	if !killed {
+		t.Error("el kill switch no fue ejecutado")
 	}
 }

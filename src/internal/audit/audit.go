@@ -22,6 +22,7 @@ type Event struct {
 // EncryptedEvent es un evento ya cifrado con KMS Envelope, listo para persistir.
 type EncryptedEvent struct {
 	Ciphertext []byte
+	DEKID      string
 }
 
 // Store persiste lotes de eventos cifrados (lo implementa el writer a PostgreSQL).

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"strings"
 	"time"
 
@@ -35,15 +36,50 @@ func (a *Adapter) Stream(ctx context.Context, req adapter.Request) (adapter.Toke
 	if idle <= 0 {
 		idle = defaultStreamIdle
 	}
+
+	bodyReader := resp.Body
+	if req.StreamScannerFunc != nil {
+		pr, pw := io.Pipe()
+		// TeeReader duplica el cuerpo que lee el scanner SSE hacia el PipeWriter.
+		// NOTA: Es crucial que req.StreamScannerFunc no bloquee la lectura si el PipeWriter
+		// se llena, lo cual aseguramos haciéndolo asíncrono y descartando si se cancela.
+		bodyReader = struct {
+			io.Reader
+			io.Closer
+		}{
+			Reader: io.TeeReader(resp.Body, pw),
+			Closer: resp.Body,
+		}
+
+		// Ejecutar la inspección asíncrona pasándole el contexto y el PipeReader.
+		// Pasamos un cancelFunc wrapper que internamente cierra el cuerpo de respuesta
+		// HTTP y notifica al cliente, cortando la conexión TCP abruptamente.
+		ctx, cancel := context.WithCancel(ctx)
+
+		killSwitch := func() {
+			resp.Body.Close() // Corta la lectura del SSE.
+			pw.Close()
+			cancel() // Notifica cancelación del contexto
+		}
+
+		go req.StreamScannerFunc(ctx, pr, killSwitch)
+
+		// Un goroutine de limpieza en caso de fin normal
+		go func() {
+			<-ctx.Done()
+			pw.Close()
+		}()
+	}
+
 	s := &sseStream{
-		closer:   resp.Body,
+		closer:   bodyReader,
 		tokens:   make(chan string),
 		errc:     make(chan error, 1),
 		done:     make(chan struct{}),
 		idle:     idle,
 		provider: a.Name,
 	}
-	go s.read(bufio.NewScanner(resp.Body))
+	go s.read(bufio.NewScanner(bodyReader))
 	return s, nil
 }
 

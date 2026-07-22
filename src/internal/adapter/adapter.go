@@ -6,6 +6,7 @@ package adapter
 import (
 	"context"
 	"fmt"
+	"io"
 )
 
 // Message es un turno de conversación en formato interno (estilo OpenAI).
@@ -37,6 +38,12 @@ type Request struct {
 	Stream    bool
 	Input     []string       // para embeddings
 	Params    map[string]any // params extra estilo OpenAI (ej. seed); cada adapter decide qué soporta
+
+	// StreamScannerFunc permite inspeccionar de forma asíncrona la respuesta en vuelo (ej. DLP).
+	// Si está definido y la petición es streaming, el adaptador envuelve su cuerpo de respuesta
+	// y llama a esta función con un reader conectado, pasándole una función cancelFunc
+	// que interrumpirá el contexto del request si se detecta una violación.
+	StreamScannerFunc func(ctx context.Context, stream io.Reader, cancelFunc context.CancelFunc)
 }
 
 // Response es la respuesta normalizada de chat.
