@@ -31,3 +31,5 @@ Como **ingeniero de seguridad**, quiero **soportar autenticación mediante OAuth
 
 ## Notas técnicas
 - Asegurar alineación con NFRs de latencia y uso de caché si aplica.
+
+> **OpenSpec change**: `ep-004a-identidad-accesos` (EP-004A)
