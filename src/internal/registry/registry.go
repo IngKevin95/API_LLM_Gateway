@@ -10,6 +10,8 @@ import (
 	"sort"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/IngKevin95/API_LLM_Gateway/internal/secrets"
 )
 
 // envRef matchea una referencia a variable de entorno: ${NOMBRE}.
@@ -49,20 +51,31 @@ type routing struct {
 	Capabilities map[string]CapabilityRoute `yaml:"capabilities"`
 }
 
-type rawConfig struct {
-	Providers []Provider `yaml:"providers"`
-	Routing   routing    `yaml:"routing"`
+type serverConfig struct {
+	ReadHeaderTimeoutMs int `yaml:"read_header_timeout_ms"`
+	WriteTimeoutMs      int `yaml:"write_timeout_ms"`
 }
 
-// Registry es el catálogo cargado en memoria.
+type rawConfig struct {
+	Server    serverConfig `yaml:"server"`
+	Providers []Provider   `yaml:"providers"`
+	Routing   routing      `yaml:"routing"`
+}
+
 type Registry struct {
+	server    serverConfig
 	providers map[string]Provider
 	routing   map[string]CapabilityRoute
 	available map[string]bool
+	sm        secrets.Manager
 }
 
-// Load lee y valida config.yaml, cargándolo en RAM.
-func Load(path string) (*Registry, error) {
+// Load lee y valida config.yaml, cargándolo en RAM. Si sm es nil, usa env por defecto.
+func Load(path string, sm secrets.Manager) (*Registry, error) {
+	if sm == nil {
+		sm = secrets.NewEnvManager()
+	}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("registry: leer %s: %w", path, err)
@@ -78,13 +91,21 @@ func Load(path string) (*Registry, error) {
 	}
 
 	reg := &Registry{
+		server:    raw.Server,
 		providers: make(map[string]Provider, len(raw.Providers)),
 		routing:   raw.Routing.Capabilities,
+		sm:        sm,
 	}
 	count := 0
 	for _, p := range raw.Providers {
+		// Intenta resolver la API key. Si falla, el provider se deshabilita silenciosamente en RAM.
 		if m := envRef.FindStringSubmatch(p.APIKey); m != nil {
-			p.APIKey = os.Getenv(m[1]) // resuelve ${VAR} desde el entorno
+			val, err := sm.Resolve(p.APIKey)
+			if err != nil {
+				log.Printf("WARN registry: omitiendo provider %q por fallo de secretos: %v", p.ID, err)
+				continue
+			}
+			p.APIKey = val
 		}
 		for i := range p.Models {
 			p.Models[i].ProviderID = p.ID
@@ -208,7 +229,20 @@ func (r *Registry) ModelNames() []string {
 
 // APIKey devuelve la API key resuelta de un provider (vacía si no existe).
 func (r *Registry) APIKey(providerID string) string {
-	return r.providers[providerID].APIKey
+	// Intentar resolver dinámicamente si es una referencia en vivo
+	val := r.providers[providerID].APIKey
+	if r.sm != nil && envRef.MatchString(val) {
+		res, err := r.sm.Resolve(val)
+		if err == nil {
+			return res
+		}
+	}
+	return val
+}
+
+// ServerTimeouts devuelve los timeouts en milisegundos para protección TCP.
+func (r *Registry) ServerTimeouts() (readHeaderMs, writeMs int) {
+	return r.server.ReadHeaderTimeoutMs, r.server.WriteTimeoutMs
 }
 
 func hasCapability(m Model, capability string) bool {

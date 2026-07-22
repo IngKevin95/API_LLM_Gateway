@@ -59,7 +59,7 @@ func TestLoad_ValidConfig_ExposesEnabledModels(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "sk-test-openai")
 	t.Setenv("ANTHROPIC_API_KEY", "sk-test-anthropic")
 
-	reg, err := Load(writeConfig(t, validYAML))
+	reg, err := Load(writeConfig(t, validYAML), nil)
 	if err != nil {
 		t.Fatalf("Load devolvió error inesperado: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestLoad_ValidConfig_ExposesEnabledModels(t *testing.T) {
 func TestLoad_InvalidYAML_FailsFast(t *testing.T) {
 	// Tab en la indentación: YAML lo rechaza como sintaxis inválida.
 	path := writeConfig(t, "providers:\n\t- id: openai\n")
-	reg, err := Load(path)
+	reg, err := Load(path, nil)
 	if err == nil {
 		t.Fatal("esperaba error por YAML inválido, obtuve nil")
 	}
@@ -113,7 +113,7 @@ routing:
     chat:
       providers: [openai]
 `
-	reg, err := Load(writeConfig(t, body))
+	reg, err := Load(writeConfig(t, body), nil)
 	if err == nil {
 		t.Fatal("esperaba error por secreto literal, obtuve nil")
 	}
@@ -144,7 +144,7 @@ routing:
     chat:
       providers: [openai]
 `
-	reg, err := Load(writeConfig(t, body))
+	reg, err := Load(writeConfig(t, body), nil)
 	if err != nil {
 		t.Fatalf("Load error inesperado: %v", err)
 	}
@@ -155,8 +155,8 @@ routing:
 
 // AC5 — Happy: parámetros de red físicos (max_in_flight, stream_idle_timeout) expuestos.
 func TestLoad_NetworkParams_Exposed(t *testing.T) {
-	t.Setenv("OPENAI_API_KEY", "sk-x")
-	reg, err := Load(writeConfig(t, validYAML))
+	t.Setenv("OPENAI_API_KEY", "sk-x"); t.Setenv("ANTHROPIC_API_KEY", "sk-y")
+	reg, err := Load(writeConfig(t, validYAML), nil)
 	if err != nil {
 		t.Fatalf("Load error inesperado: %v", err)
 	}
@@ -194,7 +194,7 @@ routing:
     embedding:
       providers: [openai]
 `
-	reg, err := Load(writeConfig(t, body))
+	reg, err := Load(writeConfig(t, body), nil)
 	if err != nil {
 		t.Fatalf("no debe abortar por capacidad vacía: %v", err)
 	}
@@ -223,7 +223,7 @@ routing:
     chat:
       providers: [openai]
 `
-	reg, err := Load(writeConfig(t, body))
+	reg, err := Load(writeConfig(t, body), nil)
 	if err == nil {
 		t.Fatal("esperaba error por provider sin id, obtuve nil")
 	}
