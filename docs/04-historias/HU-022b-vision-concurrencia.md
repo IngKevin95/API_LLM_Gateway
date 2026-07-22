@@ -33,3 +33,5 @@ Contexto: se extrae de HU-022 (rate limiting genérico) porque la política de `
 ## Notas técnicas
 
 El detalle interno de balanceo (Least Connections vs Hash L7) vive aquí como nota, no como AC: el AC solo compromete el comportamiento observable (429 al exceder 2 concurrentes y enrutamiento por carga).
+
+> **OpenSpec change**: `ep-004a-identidad-accesos` (EP-004A)

@@ -104,6 +104,7 @@ Fuente: `docs/01-prd/api-llm-gateway.md`. Objetivos del PRD:
 |---|---|
 | Objetivo(s) del PRD cubiertos | Obj. 4 |
 | Capa (build) | foundational |
+| OpenSpec change | ep-004a-identidad-accesos |
 | Métrica de éxito | 100% de peticiones autenticadas + autorizadas por scope |
 
 **De qué se trata**: AuthN (API key / OAuth2-OIDC / mTLS), AuthZ por scope/RBAC y por tenant con aislamiento multi-tenant, rate limiting, y prevención de abuso a nivel red.

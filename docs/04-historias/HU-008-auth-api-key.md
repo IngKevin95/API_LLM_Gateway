@@ -34,3 +34,5 @@ Contexto: AuthN base del producto; base de la seguridad empresarial. Actividad 1
 ## Notas técnicas
 
 Comparación de keys en tiempo constante; almacenar hash, no la key en claro; nunca loguear la key.
+
+> **OpenSpec change**: `ep-004a-identidad-accesos` (EP-004A)

@@ -17,11 +17,11 @@ Contexto: Capa de defensa determinista in-memory antes de enrutar la petición.
 
 | # | Escenario | Given | When | Then |
 |---|-----------|-------|------|------|
-| 1 | Happy — dentro del límite | Dado que un cliente con límite de 60 req/minuto | Cuando hace su petición número 10 en ese minuto | Entonces la petición routes request to provider |
+| 1 | Happy — dentro del límite | Dado que un cliente con límite de 60 req/minuto | Cuando hace su petición número 10 en ese minuto | Entonces la petición se admite y continúa al ruteo |
 | 2 | Error — rate limit excedido | Dado que un cliente excede las 60 req/minuto | Cuando hace su petición 61 | Entonces la Gateway bloquea devolviendo un `429 Too Many Requests` en menos de 5ms, sin llamar a LLMs |
-| 3 | Error — payload gigante | Dado que un cliente envía una imagen en base64 de 51MB (justo encima del límite de 50MB) | Cuando pasa la autenticación | Entonces la Gateway intercepta el tamaño excediendo 50MB, corta el stream y devuelve `413 Payload Too Large` |
+| 3 | Error — payload vision excede 50MB | Dado que un cliente envía una imagen en base64 de 51MB (límite de contenido `vision` = 50MB, per PRD §2) | Cuando pasa la autenticación | Entonces la Gateway intercepta el tamaño excediendo 50MB, corta el stream y devuelve `413 Payload Too Large` |
 | 4 | Edge — race conditions en límite | Dado que un cliente con 1 token restante de rate limit | Cuando envía 10 peticiones concurrentes | Entonces la validación atómica en RAM permite solo 1 y bloquea 9 |
-| 5 | Rechazo Payload 10MB | Dado que un cliente envía un JSON de texto plano mayor a 10MB | Cuando el payload entra al gateway | Entonces el sistema rechaza inmediatamente con `413 Payload Too Large` |
+| 5 | Error — payload de texto excede 10MB | Dado que un cliente envía un JSON de texto plano mayor a 10MB (límite de contenido de texto = 10MB, per PRD §2; distinto del límite de 50MB de `vision`) | Cuando el payload entra al gateway | Entonces el sistema rechaza inmediatamente con `413 Payload Too Large` |
 | 6 | Sad path — Ataque Slowloris | Dado que un cliente malicioso abre una conexión TCP | Cuando el timer estricto de lectura (ReadHeaderTimeout de 5s) expira | Entonces el Gateway cierra forzosamente la conexión TCP liberando los recursos |
 
 > El límite de concurrencia y enrutamiento de red específicos de la capacidad `vision` se separan en **HU-022b**.
@@ -40,3 +40,5 @@ Contexto: Capa de defensa determinista in-memory antes de enrutar la petición.
 Debe funcionar 100% en `Local RAM Cache` (cero red) para mantener overhead mínimo.
 **Importante**: Requiere configuración de Sticky Sessions (Hash de API Key) en el Load Balancer para que el límite en RAM sea totalmente exacto sin usar Redis.
 
+
+> **OpenSpec change**: `ep-004a-identidad-accesos` (EP-004A)

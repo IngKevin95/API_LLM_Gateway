@@ -35,3 +35,5 @@ Contexto: AuthZ sobre la AuthN de HU-008. Aislamiento multi-tenant. Actividad 1.
 ## Notas técnicas
 
 Negación por defecto: sin scope explícito no hay acceso. Aislamiento estricto por tenant.
+
+> **OpenSpec change**: `ep-004a-identidad-accesos` (EP-004A)
