@@ -13,6 +13,7 @@ import (
 type Processor interface {
 	ProcessChat(ctx context.Context, req *adapter.Request) (*adapter.Response, error)
 	ProcessChatStream(ctx context.Context, req *adapter.Request) (adapter.TokenStream, error)
+	ProcessEmbedding(ctx context.Context, req *adapter.Request) (*adapter.Embedding, error)
 }
 
 // Handler HTTP para los endpoints de OpenAI.
@@ -138,4 +139,74 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, internalR
 
 	w.Write([]byte("data: [DONE]\n\n"))
 	flusher.Flush()
+}
+
+func (h *Handler) HandleEmbeddings(w http.ResponseWriter, r *http.Request) {
+	var req EmbeddingRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":{"message":"Invalid JSON payload","type":"invalid_request_error"}}`, http.StatusBadRequest)
+		return
+	}
+
+	var inputs []string
+	switch v := req.Input.(type) {
+	case string:
+		inputs = []string{v}
+	case []interface{}:
+		for _, item := range v {
+			if str, ok := item.(string); ok {
+				inputs = append(inputs, str)
+			}
+		}
+	}
+
+	if len(inputs) == 0 {
+		http.Error(w, `{"error":{"message":"Input is required","type":"invalid_request_error"}}`, http.StatusBadRequest)
+		return
+	}
+
+	internalReq := &adapter.Request{
+		Model: req.Model,
+		Input: inputs,
+	}
+
+	resp, err := h.processor.ProcessEmbedding(r.Context(), internalReq)
+	if err != nil {
+		http.Error(w, `{"error":{"message":"Internal server error","type":"server_error"}}`, http.StatusInternalServerError)
+		return
+	}
+
+	var data []EmbeddingData
+	for i, vec := range resp.Vectors {
+		data = append(data, EmbeddingData{
+			Object:    "embedding",
+			Index:     i,
+			Embedding: vec,
+		})
+	}
+
+	openaiResp := EmbeddingResponse{
+		Object: "list",
+		Data:   data,
+		Model:  req.Model,
+		Usage: Usage{
+			PromptTokens:     0,
+			TotalTokens:      0,
+		},
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(openaiResp)
+}
+
+func (h *Handler) HandleModels(w http.ResponseWriter, r *http.Request) {
+	resp := map[string]any{
+		"object": "list",
+		"data": []map[string]any{
+			{"id": "router.coding", "object": "model", "created": time.Now().Unix(), "owned_by": "gateway"},
+			{"id": "gpt-4o", "object": "model", "created": time.Now().Unix(), "owned_by": "openai"},
+		},
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }

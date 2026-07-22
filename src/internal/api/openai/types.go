@@ -70,3 +70,23 @@ type ChunkMessage struct {
 	Role    string `json:"role,omitempty"`
 	Content string `json:"content,omitempty"`
 }
+
+// EmbeddingRequest represents the OpenAI embedding request payload.
+type EmbeddingRequest struct {
+	Model string `json:"model"`
+	Input any    `json:"input"` // Can be string or []string
+}
+
+// EmbeddingResponse represents the OpenAI embedding response payload.
+type EmbeddingResponse struct {
+	Object string          `json:"object"`
+	Data   []EmbeddingData `json:"data"`
+	Model  string          `json:"model"`
+	Usage  Usage           `json:"usage"`
+}
+
+type EmbeddingData struct {
+	Object    string    `json:"object"`
+	Index     int       `json:"index"`
+	Embedding []float64 `json:"embedding"`
+}

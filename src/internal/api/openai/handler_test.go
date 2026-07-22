@@ -18,6 +18,7 @@ type mockProcessor struct {
 	resp   *adapter.Response
 	err    error
 	stream adapter.TokenStream
+	embed  *adapter.Embedding
 }
 
 func (m *mockProcessor) ProcessChat(ctx context.Context, req *adapter.Request) (*adapter.Response, error) {
@@ -26,6 +27,10 @@ func (m *mockProcessor) ProcessChat(ctx context.Context, req *adapter.Request) (
 
 func (m *mockProcessor) ProcessChatStream(ctx context.Context, req *adapter.Request) (adapter.TokenStream, error) {
 	return m.stream, m.err
+}
+
+func (m *mockProcessor) ProcessEmbedding(ctx context.Context, req *adapter.Request) (*adapter.Embedding, error) {
+	return m.embed, m.err
 }
 
 type mockStream struct {
@@ -116,5 +121,53 @@ func TestHandleChatCompletions_InvalidJSON(t *testing.T) {
 
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", rr.Code)
+	}
+}
+
+func TestHandleEmbeddings(t *testing.T) {
+	processor := &mockProcessor{
+		embed: &adapter.Embedding{Vectors: [][]float64{{0.1, 0.2}, {0.3, 0.4}}},
+	}
+	handler := openai.NewHandler(processor)
+
+	reqBody := []byte(`{"model":"text-embedding-3","input":["hola","mundo"]}`)
+	req, _ := http.NewRequest("POST", "/v1/embeddings", bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	handler.HandleEmbeddings(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+
+	var resp openai.EmbeddingResponse
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("error decoding: %v", err)
+	}
+
+	if len(resp.Data) != 2 {
+		t.Fatalf("expected 2 vectors, got %d", len(resp.Data))
+	}
+	if resp.Data[0].Embedding[0] != 0.1 {
+		t.Errorf("expected 0.1, got %f", resp.Data[0].Embedding[0])
+	}
+}
+
+func TestHandleModels(t *testing.T) {
+	handler := openai.NewHandler(&mockProcessor{})
+
+	req, _ := http.NewRequest("GET", "/v1/models", nil)
+	rr := httptest.NewRecorder()
+	handler.HandleModels(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+
+	var resp map[string]any
+	json.NewDecoder(rr.Body).Decode(&resp)
+	if resp["object"] != "list" {
+		t.Errorf("expected object=list, got %v", resp["object"])
 	}
 }
