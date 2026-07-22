@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"strings"
 	"time"
 
@@ -30,8 +31,36 @@ func (a *Adapter) Stream(ctx context.Context, req adapter.Request) (adapter.Toke
 	if idle <= 0 {
 		idle = defaultStreamIdle
 	}
-	s := &sseStream{closer: resp.Body, tokens: make(chan string), errc: make(chan error, 1), done: make(chan struct{}), idle: idle}
-	go s.read(bufio.NewScanner(resp.Body))
+
+	bodyReader := resp.Body
+	if req.StreamScannerFunc != nil {
+		pr, pw := io.Pipe()
+		bodyReader = struct {
+			io.Reader
+			io.Closer
+		}{
+			Reader: io.TeeReader(resp.Body, pw),
+			Closer: resp.Body,
+		}
+
+		ctx, cancel := context.WithCancel(ctx)
+
+		killSwitch := func() {
+			resp.Body.Close()
+			pw.Close()
+			cancel()
+		}
+
+		go req.StreamScannerFunc(ctx, pr, killSwitch)
+
+		go func() {
+			<-ctx.Done()
+			pw.Close()
+		}()
+	}
+
+	s := &sseStream{closer: bodyReader, tokens: make(chan string), errc: make(chan error, 1), done: make(chan struct{}), idle: idle}
+	go s.read(bufio.NewScanner(bodyReader))
 	return s, nil
 }
 

@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
+	"github.com/IngKevin95/API_LLM_Gateway/internal/dlp"
 )
 
 type Processor interface {
@@ -29,9 +30,10 @@ func (h *Handler) HandleMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	internalReq := &adapter.Request{
-		Model:     req.Model,
-		MaxTokens: req.MaxTokens,
-		Stream:    req.Stream,
+		Model:             req.Model,
+		MaxTokens:         req.MaxTokens,
+		Stream:            req.Stream,
+		StreamScannerFunc: dlp.ScannerFromContext(r.Context()),
 	}
 
 	for _, m := range req.Messages {
@@ -132,7 +134,7 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, internalR
 
 	// content_block_stop
 	w.Write([]byte("event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n"))
-	
+
 	// message_stop
 	w.Write([]byte("event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"))
 	flusher.Flush()

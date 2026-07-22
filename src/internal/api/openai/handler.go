@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
+	"github.com/IngKevin95/API_LLM_Gateway/internal/dlp"
 )
 
 // Processor maneja la lógica de negocio subyacente.
@@ -33,9 +34,10 @@ func (h *Handler) HandleChatCompletions(w http.ResponseWriter, r *http.Request) 
 	}
 
 	internalReq := &adapter.Request{
-		Model:     req.Model,
-		MaxTokens: req.MaxTokens,
-		Stream:    req.Stream,
+		Model:             req.Model,
+		MaxTokens:         req.MaxTokens,
+		Stream:            req.Stream,
+		StreamScannerFunc: dlp.ScannerFromContext(r.Context()),
 	}
 	for _, m := range req.Messages {
 		internalReq.Messages = append(internalReq.Messages, adapter.Message{
@@ -190,8 +192,8 @@ func (h *Handler) HandleEmbeddings(w http.ResponseWriter, r *http.Request) {
 		Data:   data,
 		Model:  req.Model,
 		Usage: Usage{
-			PromptTokens:     0,
-			TotalTokens:      0,
+			PromptTokens: 0,
+			TotalTokens:  0,
 		},
 	}
 
