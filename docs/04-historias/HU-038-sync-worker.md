@@ -35,3 +35,5 @@ Contexto: Handler envía eventos asincronista → Sync Worker → PostgreSQL (v�
 ## Notas técnicas
 
 Usa `sync.Pool` para reutilizar buffers de eventos. Implementa graceful shutdown (flush antes de exit). Coordina con HU-039 (WAL) y HU-040 (Graceful Shutdown).
+
+> **OpenSpec change**: `ep-009-persistencia-asincronista` (EP-009)

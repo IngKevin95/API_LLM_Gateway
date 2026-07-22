@@ -35,3 +35,5 @@ Contexto: antes que Sync Worker escriba a PostgreSQL, bufferea en WAL local. En 
 ## Notas técnicas
 
 WAL vive en `/var/lib/gateway/wal/`. Serialización: JSON línea por línea. Recover Worker (HU-040) lo procesa en boot.
+
+> **OpenSpec change**: `ep-009-persistencia-asincronista` (EP-009)

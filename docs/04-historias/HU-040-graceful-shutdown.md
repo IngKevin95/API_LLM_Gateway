@@ -35,3 +35,5 @@ Contexto: Gateway recibe SIGTERM → flush WAL → flush Sync Worker buffers →
 ## Notas técnicas
 
 Coordinación: main() registra signal handler → notifica channels de Sync Worker / Health Monitor / LLM Handler → cada uno drena → exit. MaxDrainWait: 30s. Recovery vive en HU-040 boot.
+
+> **OpenSpec change**: `ep-009-persistencia-asincronista` (EP-009)

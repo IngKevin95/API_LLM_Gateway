@@ -245,6 +245,7 @@ Fuente: `docs/01-prd/api-llm-gateway.md`. Objetivos del PRD:
 |---|---|
 | Objetivo(s) del PRD cubiertos | Obj. 4 (Auditoría y Seguridad), Obj. 2 (Resiliencia) |
 | Capa (build) | foundational |
+| OpenSpec change | ep-009-persistencia-asincronista |
 | Métrica de éxito | Logs de auditoría persisten de forma inmutable en PostgreSQL sin pérdida ante caída del Gateway; crash recovery restaura cuotas/auth desde WAL en < 5min; secretos nunca se loguean en plaintext |
 
 **De qué se trata**: infraestructura asincronista de fondo (Sync Worker) que:

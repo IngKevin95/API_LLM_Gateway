@@ -35,3 +35,5 @@ Contexto: Fase 2. DBA ajusta cuotas en PostgreSQL → Cache Invalidator detecta 
 ## Notas técnicas
 
 Worker 1 — polling: `SELECT updated_at FROM Quota WHERE updated_at > last_sync`; 2 — webhook: POST /gateway/cache-invalidate (secured vía API key interna). Feature flag: `cache_invalidator.enabled` en YAML. Fase 2+, no en MVP.
+
+> **OpenSpec change**: `ep-009-persistencia-asincronista` (EP-009)
