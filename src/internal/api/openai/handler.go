@@ -33,6 +33,12 @@ func (h *Handler) HandleChatCompletions(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// HU-012a AC3: validar que messages sea obligatorio
+	if len(req.Messages) == 0 {
+		http.Error(w, `{"error":{"message":"missing messages field","type":"invalid_request_error"}}`, http.StatusBadRequest)
+		return
+	}
+
 	internalReq := &adapter.Request{
 		Model:             req.Model,
 		MaxTokens:         req.MaxTokens,
