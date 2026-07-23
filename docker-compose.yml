@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  gateway:
+    build: .
+    container_name: api-llm-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      # API Keys (configure estas con los values reales)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-sk-test}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-sk-ant-test}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-test}
+      # Gateway config
+      - GATEWAY_AUTH_TOKEN=${GATEWAY_AUTH_TOKEN:-gateway-secret-key}
+      - LOG_LEVEL=info
+    volumes:
+      # Montar config.yaml si es necesario cambios dinámicos
+      - ./src/config.yaml:/app/config.yaml:ro
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+# Para manual testing, levanta solo:
+# docker-compose up gateway
+#
+# Para testing con herramientas externas:
+# docker-compose up -d gateway
+# curl http://localhost:8080/v1/chat/completions -X POST -H "Content-Type: application/json" \
+#   -H "Authorization: Bearer gateway-secret-key" \
+#   -d '{"model":"gpt-4","messages":[{"role":"user","content":"Hello"}]}'
