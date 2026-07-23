@@ -79,7 +79,14 @@ func main() {
 
 	// HU-060: /metrics endpoint con datos reales en memoria
 	metricsHandler := metrics.NewHandler(metricsStore)
-	mux.Handle("/metrics", metricsHandler)
+	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
+		adminToken := os.Getenv("GATEWAY_ADMIN_TOKEN")
+		if adminToken == "" || r.Header.Get("Authorization") != "Bearer "+adminToken {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+		metricsHandler.ServeHTTP(w, r)
+	})
 
 	// Register OpenAI-compatible endpoints (HU-012a, HU-012b, HU-012c)
 	if processor != nil {
