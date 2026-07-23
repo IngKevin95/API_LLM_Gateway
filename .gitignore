@@ -267,7 +267,7 @@ docs/.arch-suggestions.md
 # ── /factory-arch-vertical ─────────────────────────────
 
 # ── factory-build-harness (auto) ───────────────────────
-.claude/state/build-state.json
+.claude/state/*
 # ── /factory-build-harness ──────────────────────
 
 # Go build artifacts

@@ -5,6 +5,7 @@ package router
 import (
 	"log"
 	"sort"
+	"strings"
 
 	"api-llm-gateway/internal/registry"
 	"api-llm-gateway/internal/tokenizer"
@@ -166,4 +167,88 @@ func norm(v, min, max float64) float64 {
 		return 1
 	}
 	return (v - min) / (max - min)
+}
+
+// IsCapabilityPrefix checks if a model string uses the "router:capability" prefix.
+func IsCapabilityPrefix(model string) bool {
+	return strings.HasPrefix(model, "router:")
+}
+
+// ExtractCapabilityPrefix parses "router:capability" format.
+// Returns (prefix, capability) e.g. ("router", "chat") for "router:chat".
+// For non-prefixed models, returns ("", "").
+func ExtractCapabilityPrefix(model string) (string, string) {
+	if !IsCapabilityPrefix(model) {
+		return "", ""
+	}
+	parts := strings.SplitN(model, ":", 2)
+	if len(parts) == 2 {
+		return parts[0], parts[1]
+	}
+	return "router", ""
+}
+
+// ResolveCapabilityPrefix resolves "router:capability" format or explicit model names.
+// If model is "router:chat", resolves by capability.
+// Otherwise delegates to ResolveExplicit for backward compatibility.
+func (r *Router) ResolveCapabilityPrefix(model string, estimatedTokens int) ([]registry.Model, error) {
+	if IsCapabilityPrefix(model) {
+		_, capability := ExtractCapabilityPrefix(model)
+		return r.Resolve(capability, estimatedTokens)
+	}
+	// Backward compatibility: explicit model name
+	return r.ResolveExplicit("", model, true, estimatedTokens)
+}
+
+// InferCapability detects the capability from request context.
+// Priority:
+// 1. reasoning_effort field -> "reasoning"
+// 2. input field (no messages) -> "embedding"
+// 3. image content in messages -> "vision"
+// 4. Default -> "chat"
+func InferCapability(request map[string]interface{}) string {
+	// Check for reasoning_effort (Responses API)
+	if _, hasReasoning := request["reasoning_effort"]; hasReasoning {
+		return "reasoning"
+	}
+
+	// Check for input field (embeddings)
+	if _, hasInput := request["input"]; hasInput {
+		if _, hasMessages := request["messages"]; !hasMessages {
+			return "embedding"
+		}
+	}
+
+	// Check for image content in messages
+	if messages, ok := request["messages"].([]interface{}); ok {
+		if hasImageContent(messages) {
+			return "vision"
+		}
+	}
+
+	// Default to chat
+	return "chat"
+}
+
+// hasImageContent checks if any message contains image content
+func hasImageContent(messages []interface{}) bool {
+	for _, msg := range messages {
+		if m, ok := msg.(map[string]interface{}); ok {
+			if content, ok := m["content"]; ok {
+				// Content can be string (text only) or []interface{} (mixed)
+				if contentList, ok := content.([]interface{}); ok {
+					for _, item := range contentList {
+						if itemMap, ok := item.(map[string]interface{}); ok {
+							if contentType, ok := itemMap["type"].(string); ok {
+								if contentType == "image_url" || contentType == "image" {
+									return true
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return false
 }
