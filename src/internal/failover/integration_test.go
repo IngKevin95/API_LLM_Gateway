@@ -5,11 +5,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/failover"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/registry"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/router"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/tokenizer"
+	"api-llm-gateway/internal/adapter"
+	"api-llm-gateway/internal/failover"
+	"api-llm-gateway/internal/registry"
+	"api-llm-gateway/internal/router"
+	"api-llm-gateway/internal/tokenizer"
 )
 
 // journey_smoke SS3: catálogo real (config.yaml) + router (EP-001) + failover

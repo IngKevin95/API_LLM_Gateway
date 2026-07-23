@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/security/dlp"
+	"api-llm-gateway/internal/security/dlp"
 )
 
 // HU-026a AC1 — Redacción: Payload sin secretos aprobado

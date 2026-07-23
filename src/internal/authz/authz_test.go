@@ -5,8 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/auth"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/authz"
+	"api-llm-gateway/internal/auth"
+	"api-llm-gateway/internal/authz"
 )
 
 // extractor de prueba: lee la intención de la petición desde headers.

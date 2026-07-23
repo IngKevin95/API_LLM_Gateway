@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/security/dlp"
+	"api-llm-gateway/internal/security/dlp"
 )
 
 // HU-026b AC1 — Happy: Kill-switch TCP a los 200ms

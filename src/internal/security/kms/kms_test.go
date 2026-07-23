@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/security/kms"
+	"api-llm-gateway/internal/security/kms"
 )
 
 // HU-028 AC1 — Happy: Inserción cifrada con DEK

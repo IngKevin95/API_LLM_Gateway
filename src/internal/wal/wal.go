@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/audit"
+	"api-llm-gateway/internal/audit"
 )
 
 // WAL es un log append-only con rotación. Seguro concurrente.

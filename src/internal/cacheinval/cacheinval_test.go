@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/cacheinval"
+	"api-llm-gateway/internal/cacheinval"
 )
 
 // HU-041 AC4 — Fase 1: con el flag OFF, Invalidate es no-op.

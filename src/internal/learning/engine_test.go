@@ -3,7 +3,7 @@ package learning_test
 import (
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/learning"
+	"api-llm-gateway/internal/learning"
 )
 
 type mockMetricProvider struct {

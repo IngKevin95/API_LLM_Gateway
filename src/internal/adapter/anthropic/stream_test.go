@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter/anthropic"
+	"api-llm-gateway/internal/adapter"
+	"api-llm-gateway/internal/adapter/anthropic"
 )
 
 func drain(t *testing.T, ts adapter.TokenStream) (string, error) {

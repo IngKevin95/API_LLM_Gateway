@@ -12,7 +12,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
+	"api-llm-gateway/internal/adapter"
 )
 
 const (

@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/metrics"
+	"api-llm-gateway/internal/metrics"
 )
 
 type mockStore struct {

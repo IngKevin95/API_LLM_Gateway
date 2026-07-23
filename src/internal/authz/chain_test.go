@@ -5,9 +5,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/auth"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/auth/apikey"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/authz"
+	"api-llm-gateway/internal/auth"
+	"api-llm-gateway/internal/auth/apikey"
+	"api-llm-gateway/internal/authz"
 )
 
 // journey_smoke SS1: cadena authN (API key) → authZ (scope/tenant) sobre un

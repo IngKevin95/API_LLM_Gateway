@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/health"
+	"api-llm-gateway/internal/health"
 )
 
 // HU-005 AC1 — Happy: proveedor sano se mantiene sano.

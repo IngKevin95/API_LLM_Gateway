@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/registry"
+	"api-llm-gateway/internal/registry"
 )
 
 // HU-002b AC1 — Sad: capacidad desconocida → ErrUnknownCapability (→400).

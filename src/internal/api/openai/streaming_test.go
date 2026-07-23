@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/api/openai"
+	"api-llm-gateway/internal/api/openai"
 )
 
 // mockTokenStream para simular stream de tokens.

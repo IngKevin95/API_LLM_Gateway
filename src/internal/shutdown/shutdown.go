@@ -9,9 +9,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/audit"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/syncworker"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/wal"
+	"api-llm-gateway/internal/audit"
+	"api-llm-gateway/internal/syncworker"
+	"api-llm-gateway/internal/wal"
 )
 
 // Coordinator drena requests en vuelo y flushea el Sync Worker ante el cierre.

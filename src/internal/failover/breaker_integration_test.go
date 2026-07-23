@@ -6,13 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/breaker"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/failover"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/health"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/registry"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/router"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/tokenizer"
+	"api-llm-gateway/internal/adapter"
+	"api-llm-gateway/internal/breaker"
+	"api-llm-gateway/internal/failover"
+	"api-llm-gateway/internal/health"
+	"api-llm-gateway/internal/registry"
+	"api-llm-gateway/internal/router"
+	"api-llm-gateway/internal/tokenizer"
 )
 
 // El breaker hace fast-fail de un proveedor tripped: el engine lo saltea.

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
+	"api-llm-gateway/internal/adapter"
 )
 
 type mockAdapter struct {

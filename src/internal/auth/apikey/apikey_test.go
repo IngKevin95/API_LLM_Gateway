@@ -5,8 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/auth"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/auth/apikey"
+	"api-llm-gateway/internal/auth"
+	"api-llm-gateway/internal/auth/apikey"
 )
 
 // handler dummy que reporta la identidad inyectada en el context.

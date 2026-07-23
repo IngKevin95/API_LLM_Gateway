@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/governance/quota"
+	"api-llm-gateway/internal/governance/quota"
 )
 
 // HU-006 AC1 — Dentro de cuota: contador incrementa, cuota restante consultable.

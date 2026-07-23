@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter/omniroute"
+	"api-llm-gateway/internal/adapter"
+	"api-llm-gateway/internal/adapter/omniroute"
 )
 
 // HU-036 AC1 — Petición exitosa vía OmniRoute

@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/promptguard"
+	"api-llm-gateway/internal/adapter"
+	"api-llm-gateway/internal/promptguard"
 )
 
 func req(msgs ...adapter.Message) adapter.Request { return adapter.Request{Messages: msgs} }

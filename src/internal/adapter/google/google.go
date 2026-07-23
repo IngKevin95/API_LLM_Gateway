@@ -10,7 +10,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
+	"api-llm-gateway/internal/adapter"
 )
 
 const defaultBaseURL = "https://generativelanguage.googleapis.com"
@@ -70,7 +70,8 @@ type geminiResponse struct {
 func (a *Adapter) Chat(ctx context.Context, req adapter.Request) (adapter.Response, error) {
 	greq := a.buildRequest(req)
 
-	path := fmt.Sprintf("/v1beta/models/%s:generateContent?key=%s", req.Model, a.apiKey)
+	// Use Authorization header instead of query param to avoid exposing API key in URLs
+	path := fmt.Sprintf("/v1beta/models/%s:generateContent", req.Model)
 	buf, err := json.Marshal(greq)
 	if err != nil {
 		return adapter.Response{}, a.protocolError(err)
@@ -80,6 +81,7 @@ func (a *Adapter) Chat(ctx context.Context, req adapter.Request) (adapter.Respon
 	if err != nil {
 		return adapter.Response{}, a.protocolError(err)
 	}
+	httpReq.Header.Set("Authorization", "Bearer "+a.apiKey)
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	resp, err := a.client.Do(httpReq)

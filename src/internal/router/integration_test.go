@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/registry"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/router"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/tokenizer"
+	"api-llm-gateway/internal/registry"
+	"api-llm-gateway/internal/router"
+	"api-llm-gateway/internal/tokenizer"
 )
 
 // journey_smoke sub-slice 2: catálogo real (config.yaml) + Router resuelven

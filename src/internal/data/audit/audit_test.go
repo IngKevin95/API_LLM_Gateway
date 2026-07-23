@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/data/audit"
+	"api-llm-gateway/internal/data/audit"
 )
 
 // HU-010 AC1 — Happy: Evento inmediato tras petición exitosa

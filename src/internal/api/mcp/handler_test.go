@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/api/mcp"
+	"api-llm-gateway/internal/api/mcp"
 )
 
 // stubModels implementa ModelSource para tests.

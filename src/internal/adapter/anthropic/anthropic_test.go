@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter/anthropic"
+	"api-llm-gateway/internal/adapter"
+	"api-llm-gateway/internal/adapter/anthropic"
 )
 
 // captura el body del request para verificar la traducción.

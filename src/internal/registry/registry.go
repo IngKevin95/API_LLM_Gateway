@@ -11,7 +11,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/secrets"
+	"api-llm-gateway/internal/secrets"
 )
 
 // envRef matchea una referencia a variable de entorno: ${NOMBRE}.

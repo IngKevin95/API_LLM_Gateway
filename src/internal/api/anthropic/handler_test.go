@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/api/anthropic"
+	"api-llm-gateway/internal/adapter"
+	"api-llm-gateway/internal/api/anthropic"
 )
 
 type mockProcessor struct {

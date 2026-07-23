@@ -3,7 +3,7 @@
 // local. Es el último eslabón de degradación de la cadena de failover.
 package local
 
-import "github.com/IngKevin95/API_LLM_Gateway/internal/adapter/openai"
+import "api-llm-gateway/internal/adapter/openai"
 
 // New crea un adapter local OpenAI-compatible apuntando a baseURL (sin api_key).
 // El timeout se aplica vía el context de la petición (TTFT/timeout dinámico del

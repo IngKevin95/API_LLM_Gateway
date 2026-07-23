@@ -7,11 +7,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter/aihubmix"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter/google"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter/omniroute"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter/openrouter"
+	"api-llm-gateway/internal/adapter"
+	"api-llm-gateway/internal/adapter/aihubmix"
+	"api-llm-gateway/internal/adapter/google"
+	"api-llm-gateway/internal/adapter/omniroute"
+	"api-llm-gateway/internal/adapter/openrouter"
 )
 
 // ponytail: test de integración EP-008, sin necesidad de infra real

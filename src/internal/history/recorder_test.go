@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/history"
+	"api-llm-gateway/internal/history"
 )
 
 type mockPersister struct {

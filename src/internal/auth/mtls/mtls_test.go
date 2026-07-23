@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/auth"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/auth/mtls"
+	"api-llm-gateway/internal/auth"
+	"api-llm-gateway/internal/auth/mtls"
 )
 
 type ca struct {

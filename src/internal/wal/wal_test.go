@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/audit"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/wal"
+	"api-llm-gateway/internal/audit"
+	"api-llm-gateway/internal/wal"
 )
 
 func ev(id string) audit.Event {
