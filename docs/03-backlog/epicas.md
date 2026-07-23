@@ -272,6 +272,73 @@ Fuente: `docs/01-prd/api-llm-gateway.md`. Objetivos del PRD:
 
 ---
 
+## EP-010 · Compatibilidad Universal Clientes
+
+| Campo | Valor |
+|---|---|
+| Objetivo(s) del PRD cubiertos | Obj. 5 (Compatibilidad universal) |
+| Capa (build) | business |
+| OpenSpec change | compatibilidad-universal-clientes |
+| Métrica de éxito | OpenCode y Free Claude Code apuntan a Gateway y envían requests sin modificar código; parámetros OpenAI/Anthropic completos funcionan (temperature, top_p, thinking, system role); endpoint /models expone metadata de capacidades |
+
+**De qué se trata**: completar la compatibilidad de la API con clientes OpenAI y Anthropic: routing automático por capacidad (sin modelo explícito), parámetros completos, normalización transparente de formatos solicitud/respuesta, y metadatos de modelos.
+
+**Por qué existe**: Es la interfaz pública del Gateway; sin ella no hay consumidores. Permite a OpenCode y Free Claude Code apuntar directamente sin cambiar código, realizando el "LLM universal" del PRD.
+
+**Capabilities que agrupa**:
+- Routing automático por capability (sin parámetro `model`)
+- Parámetros OpenAI completos (temperature, top_p, presence_penalty, etc.)
+- Parámetros Anthropic completos (thinking, extended thinking, system role)
+- Normalización transparente solicitud/respuesta
+- Endpoint /models con metadata de capacidades
+
+**Historias anticipadas**:
+- HU-042 — Routing automático por capability sin modelo explícito
+- HU-043 — Endpoint responses compatibles OpenCode
+- HU-044 — Parámetros OpenAI completos (temperature, top_p, etc.)
+- HU-045 — Parámetros Anthropic completos (thinking, system role)
+- HU-046 — Endpoint /models con metadata de capacidades
+- HU-047 — Middleware normalización de formatos (solicitud/respuesta)
+- HU-048 — Documentación y configuración de herramientas
+
+---
+
+## EP-011 · MVP Fixes & Completeness (Observabilidad Operacional)
+
+| Campo | Valor |
+|---|---|
+| Objetivo(s) del PRD cubiertos | Obj. 3, Obj. 4, Obj. 5 |
+| Capa (build) | completeness (MVP) |
+| OpenSpec change | mvp-fixes-observability |
+| Métrica de éxito | POST /v1/chat/completions devuelve HTTP 200 con choice.content válido; /v1/embeddings y /v1/messages funcionan; OmniRoute disponible como proveedor; logs estructurados JSON en todos los handlers; métricas operacionales expuestas en /metrics |
+
+**De qué se trata**: completar handlers MVP rotos (`/v1/chat/completions` 500, `/v1/embeddings` 503, `/v1/messages` 400); crear adaptador OmniRoute; normalizar IDs de proveedores en config.yaml; añadir observabilidad (logging JSON + métricas reales p50/p95/p99).
+
+**Por qué existe**: MVP actual tiene handlers que devuelven errores HTTP. Esta épica es el puente entre "discovery completado" (EP-001-010) y "MVP funcional end-to-end" que el equipo pueda depurar y operar. Prerequisito para Fase 2.
+
+**Capabilities que agrupa**:
+- Debug y fix de handlers OpenAI (chat/completions, embeddings)
+- Debug y fix de handler Anthropic (messages)
+- Adaptador OmniRoute (proveedor local gratuito)
+- Normalización de IDs de proveedores (alineación config ↔ buildAdapters)
+- Logging estructurado JSON en todos los handlers
+- Métricas reales (latencia p50/p95/p99, success_rate por proveedor)
+
+**Historias anticipadas**:
+- HU-050 — Añadir logging a OpenAI handler
+- HU-051 — Debuguear y fijar GatewayProcessor.ProcessChat()
+- HU-052 — Validar que Router.Route() elige proveedor correcto
+- HU-053 — Crear adaptador OmniRoute (internal/adapter/omniroute/)
+- HU-054 — Registrar adaptador OmniRoute en buildAdapters()
+- HU-055 — Test de conectividad OmniRoute → Gateway
+- HU-056 — Alinear IDs de proveedores en config.yaml con buildAdapters()
+- HU-057 — Implementar GatewayProcessor.ProcessEmbedding()
+- HU-058 — Debuguear y fijar handler Anthropic /v1/messages
+- HU-059 — Implementar logging estructurado en todos los handlers
+- HU-060 — Implementar /metrics con datos reales de operación
+
+---
+
 ## Resumen de cobertura
 
 | Épica | Objetivo(s) del PRD |
@@ -285,12 +352,14 @@ Fuente: `docs/01-prd/api-llm-gateway.md`. Objetivos del PRD:
 | EP-007 Observabilidad y aprendizaje | Obj. 2, Obj. 3 |
 | EP-008 Adaptadores Secundarios | Obj. 2 |
 | EP-009 Sincronización Asincronista y Persistencia | Obj. 4, Obj. 2 |
+| EP-010 Compatibilidad Universal Clientes | Obj. 5 |
+| EP-011 MVP Fixes & Completeness | Obj. 3, Obj. 4, Obj. 5 |
 
 **Cobertura de objetivos** (ningún objetivo huérfano):
 - Obj. 1 → EP-001 (directo)
-- Obj. 2 → EP-002 (directo), EP-007 (retroalimenta), EP-008 (directo)
-- Obj. 3 → EP-001, EP-007
-- Obj. 4 → EP-004A, EP-004B (directo) y EP-003 (gobernanza de cuotas, per PRD §"Seguridad y gobernanza de acceso"). EP-003 también alimenta el KPI de costo (Obj. 3).
-- Obj. 5 -> EP-005
+- Obj. 2 → EP-002 (directo), EP-007 (retroalimenta), EP-008 (directo), EP-009 (directo)
+- Obj. 3 → EP-001, EP-007, EP-011 (métricas + observabilidad)
+- Obj. 4 → EP-004A, EP-004B (directo), EP-003 (gobernanza de cuotas), EP-009 (auditoría), EP-011 (logging)
+- Obj. 5 → EP-005 (base), EP-010 (parámetros completos, normalización), EP-011 (handlers funcionales)
 
 **Épicas huérfanas** (sin objetivo): ninguna. Toda épica ata a ≥1 objetivo del PRD.
