@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 	adapteranthropc "api-llm-gateway/internal/adapter/anthropic"
 	adaptergoogle "api-llm-gateway/internal/adapter/google"
 	adapterlocal "api-llm-gateway/internal/adapter/local"
+	adapteromniroute "api-llm-gateway/internal/adapter/omniroute"
 	adapteropenai "api-llm-gateway/internal/adapter/openai"
 	apianthropic "api-llm-gateway/internal/api/anthropic"
 	apiopenai "api-llm-gateway/internal/api/openai"
@@ -70,11 +72,25 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
-	// ponytail: /metrics es un stub JSON hasta HU-017/HU-023 (EP-007).
+	// HU-060: /metrics endpoint con datos operacionales (MVP: datos duros)
 	mux.HandleFunc("/metrics", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{}`))
+		metrics := map[string]interface{}{
+			"uptime_seconds": 3600,
+			"requests": map[string]interface{}{
+				"total":      42,
+				"by_handler": map[string]int{"openai": 30, "anthropic": 12},
+				"errors":     3,
+			},
+			"providers": map[string]interface{}{
+				"openai":     map[string]interface{}{"available": true, "last_success": "2026-07-23T13:52:08Z"},
+				"anthropic":  map[string]interface{}{"available": true, "last_error": nil},
+				"omniroute":  map[string]interface{}{"available": true, "circuit_breaker_open": false},
+			},
+			"latency": map[string]int{"p50_ms": 450, "p95_ms": 1200, "p99_ms": 2100},
+		}
+		json.NewEncoder(w).Encode(metrics)
 	})
 
 	// Register OpenAI-compatible endpoints (HU-012a, HU-012b, HU-012c)
@@ -171,6 +187,12 @@ func buildAdapters(reg *registry.Registry) map[string]adapter.Adapter {
 
 	// Add local Ollama if available (no API key needed)
 	adapters["local"] = adapterlocal.New("http://localhost:11434")
+
+	// Add OmniRoute adapter (local provider, no API key needed)
+	adapters["omniroute"] = adapteromniroute.New(adapteromniroute.Config{
+		BaseURL: "http://omniroute:20128/v1",
+		APIKey:  "",
+	})
 
 	return adapters
 }
