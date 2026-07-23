@@ -134,6 +134,7 @@ const (
 	wSpeed   = 0.15
 	wAvail   = 0.10
 	wQuota   = 0.05
+	wPenalty = 0.20 // HU-002: Penalización por fallos recientes
 )
 
 // scoreAll normaliza min-max cada eje sobre el conjunto de candidatos y
@@ -156,9 +157,10 @@ func (r *Router) scoreAll(models []registry.Model) map[string]float64 {
 		costN := 1 - norm(float64(m.CostPer1M), cMin, cMax)       // menor costo, mejor
 		quotaN := norm(float64(r.quota.Remaining(m.ProviderID, m.Name)), quMin, quMax)
 		availN := 1.0 // candidatos ya pasaron el filtro de salud
+		penalization := 0.0 // HU-XXX: P (fallos recientes) pendiente de alimentar desde CircuitBreaker
 
 		out[m.Name] = wQuality*qN + wCost*costN + wLatency*latN +
-			wSpeed*speedN + wAvail*availN + wQuota*quotaN
+			wSpeed*speedN + wAvail*availN + wQuota*quotaN - (wPenalty * penalization)
 	}
 	return out
 }
