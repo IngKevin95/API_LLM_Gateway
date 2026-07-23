@@ -45,6 +45,9 @@ func main() {
 		}
 	}
 
+	// HU-060: metrics store (shared by processor and handler)
+	metricsStore := metrics.NewInMemoryStore(10000)
+
 	var processor *GatewayProcessor
 	if cfgPath != "" {
 		var err error
@@ -62,8 +65,8 @@ func main() {
 		// Build Failover Engine (EP-002)
 		fe := failover.New(rt, adapters)
 
-		// Create Processor that uses Failover
-		processor = NewGatewayProcessor(fe)
+		// Create Processor that uses Failover and metrics
+		processor = NewGatewayProcessor(fe, metricsStore)
 	} else {
 		log.Printf("WARN gateway: sin config.yaml, arrancando en modo scaffold (solo /health)")
 	}
@@ -75,7 +78,6 @@ func main() {
 	})
 
 	// HU-060: /metrics endpoint con datos reales en memoria
-	metricsStore := metrics.NewInMemoryStore(10000)
 	metricsHandler := metrics.NewHandler(metricsStore)
 	mux.Handle("/metrics", metricsHandler)
 
