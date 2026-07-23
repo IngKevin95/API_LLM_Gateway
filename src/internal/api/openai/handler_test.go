@@ -171,3 +171,76 @@ func TestHandleModels(t *testing.T) {
 		t.Errorf("expected object=list, got %v", resp["object"])
 	}
 }
+
+// HU-051 AC: Error handling — translate to correct HTTP status codes
+func TestHandleChatCompletions_ErrorUnauthorized(t *testing.T) {
+	// API key inválida: esperado 401, no 500
+	processor := &mockProcessor{
+		err: &adapter.ProviderError{
+			Provider:  "openai",
+			Status:    401,
+			Retryable: false,
+			Err:       nil,
+		},
+	}
+	handler := openai.NewHandler(processor)
+
+	reqBody := []byte(`{"model":"gpt-4","messages":[{"role":"user","content":"test"}]}`)
+	req, _ := http.NewRequest("POST", "/v1/chat/completions", bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	handler.HandleChatCompletions(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", rr.Code)
+	}
+}
+
+func TestHandleChatCompletions_ErrorUnavailable(t *testing.T) {
+	// No provider disponible: esperado 503, no 500
+	processor := &mockProcessor{
+		err: &adapter.ProviderError{
+			Provider:  "gateway",
+			Status:    503,
+			Retryable: true,
+			Err:       nil,
+		},
+	}
+	handler := openai.NewHandler(processor)
+
+	reqBody := []byte(`{"model":"gpt-4","messages":[{"role":"user","content":"test"}]}`)
+	req, _ := http.NewRequest("POST", "/v1/chat/completions", bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	handler.HandleChatCompletions(rr, req)
+
+	if rr.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d", rr.Code)
+	}
+}
+
+func TestHandleChatCompletions_ErrorTimeout(t *testing.T) {
+	// Timeout: esperado 504, no 500
+	processor := &mockProcessor{
+		err: &adapter.ProviderError{
+			Provider:  "openai",
+			Status:    504,
+			Retryable: true,
+			Err:       nil,
+		},
+	}
+	handler := openai.NewHandler(processor)
+
+	reqBody := []byte(`{"model":"gpt-4","messages":[{"role":"user","content":"test"}]}`)
+	req, _ := http.NewRequest("POST", "/v1/chat/completions", bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	handler.HandleChatCompletions(rr, req)
+
+	if rr.Code != http.StatusGatewayTimeout {
+		t.Fatalf("expected 504, got %d", rr.Code)
+	}
+}
