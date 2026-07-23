@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 
 	"api-llm-gateway/internal/adapter"
 	"api-llm-gateway/internal/failover"
@@ -32,17 +32,37 @@ func NewGatewayProcessor(fe *failover.Engine) *GatewayProcessor {
 // HU-051: Debug ProcessChat() — estructura de logging y manejo de errores
 // HU-052: Validar Router.Route() — invoca failover.Complete() que usa Router.Route()
 func (gp *GatewayProcessor) ProcessChat(ctx context.Context, req *adapter.Request) (*adapter.Response, error) {
-	log.Printf("ProcessChat: model=%s, messages=%d", req.Model, len(req.Messages))
+	reqID := ctx.Value("request_id")
+
+	slog.InfoContext(ctx, "request received",
+		slog.String("component", "openai-handler"),
+		slog.String("action", "request_received"),
+		slog.String("model", req.Model),
+		slog.Int("messages_count", len(req.Messages)),
+		slog.Any("request_id", reqID),
+	)
 
 	// Use "chat" as default capability (can be overridden based on request parameters in future)
 	// HU-056: Normalizar IDs proveedores — config.yaml IDs usados por Router.Route()
 	resp, err := gp.failover.Complete(ctx, "chat", *req)
 	if err != nil {
-		log.Printf("ProcessChat ERROR: %v (type: %T)", err, err)
+		slog.ErrorContext(ctx, "request failed",
+			slog.String("component", "openai-handler"),
+			slog.String("action", "request_failed"),
+			slog.String("model", req.Model),
+			slog.Any("error", err),
+			slog.Any("request_id", reqID),
+		)
 		return nil, err
 	}
 
-	log.Printf("ProcessChat OK: content=%d chars", len(resp.Content))
+	slog.InfoContext(ctx, "request completed",
+		slog.String("component", "openai-handler"),
+		slog.String("action", "request_completed"),
+		slog.String("model", req.Model),
+		slog.Int("response_length", len(resp.Content)),
+		slog.Any("request_id", reqID),
+	)
 	return &resp, nil
 }
 
@@ -61,15 +81,39 @@ func (gp *GatewayProcessor) ProcessChatStream(ctx context.Context, req *adapter.
 }
 
 // ProcessEmbedding processes an embedding request.
-// HU-057: Implementar ProcessEmbedding() — se construye en EP-011 first slice
+// HU-057: Implementar ProcessEmbedding() — usa failover.Embed() con capability "embedding"
 // Requiere: HU-056 normalización IDs proveedores
+// AC HU-057: (1) happy path request->adapter->embedding, (2) error provider, (3) edge model no soporta embeddings
 func (gp *GatewayProcessor) ProcessEmbedding(ctx context.Context, req *adapter.Request) (*adapter.Embedding, error) {
-	// Stub para HU-057: será reemplazado por invocación failover.Embed(ctx, "embedding", *req)
-	// AC HU-057: (1) happy path request->adapter->embedding, (2) error provider, (3) edge model no soporta embeddings
-	return nil, &adapter.ProviderError{
-		Provider:  "gateway",
-		Status:    501,
-		Retryable: false,
-		Err:       errors.New("HU-057: embeddings no implementado en MVP, será completado en EP-011 first slice"),
+	reqID := ctx.Value("request_id")
+
+	slog.InfoContext(ctx, "embedding request received",
+		slog.String("component", "openai-handler"),
+		slog.String("action", "embedding_request_received"),
+		slog.String("model", req.Model),
+		slog.Int("inputs_count", len(req.Input)),
+		slog.Any("request_id", reqID),
+	)
+
+	// Use "embedding" capability (dedicated adapter capability, not chat)
+	emb, err := gp.failover.Embed(ctx, "embedding", *req)
+	if err != nil {
+		slog.ErrorContext(ctx, "embedding request failed",
+			slog.String("component", "openai-handler"),
+			slog.String("action", "embedding_request_failed"),
+			slog.String("model", req.Model),
+			slog.Any("error", err),
+			slog.Any("request_id", reqID),
+		)
+		return nil, err
 	}
+
+	slog.InfoContext(ctx, "embedding request completed",
+		slog.String("component", "openai-handler"),
+		slog.String("action", "embedding_request_completed"),
+		slog.String("model", req.Model),
+		slog.Int("vectors_count", len(emb.Vectors)),
+		slog.Any("request_id", reqID),
+	)
+	return &emb, nil
 }
