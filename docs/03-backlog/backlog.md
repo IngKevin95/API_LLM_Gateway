@@ -70,17 +70,48 @@
 - **EP-005 · API universal compatible**: HU-012a, HU-012b, HU-012c, HU-013, HU-016, HU-033
 - **EP-007 · Observabilidad y aprendizaje**: HU-017, HU-018, HU-019, HU-023, HU-032
 - **EP-008 · Adaptadores Secundarios**: HU-029, HU-030, HU-031, HU-036
+- **EP-009 · Sincronización Asincronista**: HU-038, HU-039, HU-040, HU-041
+- **EP-010 · Compatibilidad universal clientes**: HU-042, HU-043, HU-044, HU-045, HU-046, HU-047, HU-048
+- **EP-011 · MVP Fixes & Completeness**: HU-050, HU-051, HU-052, HU-053, HU-054, HU-055, HU-056, HU-057, HU-058, HU-059, HU-060
 
 ## Conteo por estado
 
 | Estado | Cantidad |
 |---|---|
-| lista | 45 |
+| lista | 67 |
 | en-curso | 0 |
 | hecha | 0 |
 | draft | 0 |
 
-Total: 45 historias (25 Must / 13 Should / 7 Could).
+| 37 | HU-038 | Implementar Sync Worker (persistencia asincronista) | EP-009 | Must | M | lista | 4 | HU-001 |
+| 38 | HU-039 | Write-Ahead Log (WAL) local con recuperación | EP-009 | Must | M | lista | 3 | HU-038 |
+| 39 | HU-040 | Graceful Shutdown con flush obligatorio | EP-009 | Must | M | lista | 3 | HU-038 |
+| 40 | HU-041 | Cache Invalidator (Fase 2+, polling/webhook) | EP-009 | Should | M | lista | 4 | — |
+| 41 | HU-042 | Routing automático por capability sin modelo explícito | EP-010 | Must | M | lista | 4 | HU-002a |
+| 42 | HU-043 | Endpoint responses compatibles OpenCode | EP-010 | Must | M | lista | 4 | HU-012a |
+| 43 | HU-044 | Parámetros OpenAI completos (temperature, top_p, etc.) | EP-010 | Must | M | lista | 4 | HU-044 |
+| 44 | HU-045 | Parámetros Anthropic completos (thinking, system role) | EP-010 | Must | M | lista | 4 | HU-013 |
+| 45 | HU-046 | Endpoint /models con metadata de capacidades | EP-010 | Must | S | lista | 3 | HU-001 |
+| 46 | HU-047 | Middleware normalización de formatos (solicitud/respuesta) | EP-010 | Must | M | lista | 4 | — |
+| 47 | HU-048 | Documentación y configuración de herramientas | EP-010 | Should | S | lista | 3 | — |
+| 48 | HU-050 | Añadir logging a OpenAI handler | EP-011 | Must | S | lista | 2 | — |
+| 49 | HU-051 | Debuguear y fijar GatewayProcessor.ProcessChat() | EP-011 | Must | M | lista | 4 | HU-050 |
+| 50 | HU-052 | Validar que Router.Route() elige proveedor correcto | EP-011 | Must | M | lista | 3 | HU-051 |
+| 51 | HU-053 | Crear adaptador OmniRoute (internal/adapter/omniroute/) | EP-011 | Must | M | lista | 4 | — |
+| 52 | HU-054 | Registrar adaptador OmniRoute en buildAdapters() | EP-011 | Must | S | lista | 2 | HU-053 |
+| 53 | HU-055 | Test de conectividad OmniRoute → Gateway | EP-011 | Must | S | lista | 3 | HU-054 |
+| 54 | HU-056 | Alinear IDs de proveedores en config.yaml | EP-011 | Must | S | lista | 2 | — |
+| 55 | HU-057 | Implementar GatewayProcessor.ProcessEmbedding() | EP-011 | Must | M | lista | 3 | HU-056 |
+| 56 | HU-058 | Debuguear y fijar handler Anthropic /v1/messages | EP-011 | Must | M | lista | 4 | HU-056 |
+| 57 | HU-059 | Implementar logging estructurado en todos los handlers | EP-011 | Should | M | lista | 5 | HU-050 |
+| 58 | HU-060 | Implementar /metrics con datos reales de operación | EP-011 | Should | M | lista | 4 | — |
+
+Total: 67 historias (47 Must / 15 Should / 5 Could).
+
+**Adiciones (2026-07-23)**:
+- EP-009 (4 HU): Sincronización asincronista y persistencia (HU-038-041)
+- EP-010 (7 HU): Compatibilidad universal clientes (HU-042-048) — en construcción
+- EP-011 (11 HU): MVP Fixes & Completeness (HU-050-060) — logging, debugging, OmniRoute, métricas
 
 ## Ideas sin desarrollar aún
 

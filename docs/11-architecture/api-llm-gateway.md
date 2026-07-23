@@ -208,6 +208,38 @@ El esquema constará de:
 
 *Nota: Los prompts y responses no se guardan en el AuditLog por defecto para evitar fugas de PII.*
 
+---
+
+## 7. Mapeo Épicas ↔ Arquitectura
+
+| Épica | Componentes afectados | Cambios arquitectónicos | Fase |
+|---|---|---|---|
+| **EP-001** · Enrutamiento por capacidad | Registry, Model Router, Config | Define declaración YAML de providers/models/capabilities; routing por score | Fase 1 (MVP) |
+| **EP-002** · Resiliencia y Conectividad | Failover Engine, Health Monitor, Adapters | Circuit breaker, cadena de fallback, health checks periódicos | Fase 1 (MVP) |
+| **EP-003** · Gobernanza (cuota/costo) | Quota Manager, PostgreSQL | O(1) RAM cache con async refresh via Sync Worker | Fase 1 (MVP) |
+| **EP-004A** · Identidad y Accesos | Auth & Rate Limit, Load Balancer | JWT/API Key validation en memoria; Sticky Sessions L7 | Fase 1 (MVP) |
+| **EP-004B** · Seguridad y Auditoría | Scanner Síncrono/Asíncrono, Sync Worker, KMS | Redacción PII síncrona; Kill-switch asíncrono; Envelope Encryption | Fase 1 (MVP) |
+| **EP-005** · API universal compatible | LLM Handler, Adapters (OpenAI, Anthropic) | Endpoints `/v1/chat/completions`, `/v1/embeddings`, `/v1/messages` | Fase 1 (MVP) |
+| **EP-007** · Observabilidad | Health Monitor, PostgreSQL | Métricas por modelo/proveedor; Dashboard endpoint | Fase 1+ |
+| **EP-008** · Adaptadores Secundarios | Adapters (Google, OpenRouter, AIHubMix, OmniRoute) | Nuevos adaptadores bajo patrón unificado | Fase 1+ |
+| **EP-009** · Sincronización Asincronista | Sync Worker, WAL, KMS, PostgreSQL | Write-Ahead Log local; Graceful Shutdown; async batch writes | Fase 1 (MVP) |
+| **EP-010** · Compatibilidad universal clientes | LLM Handler, Adapters, Model Router | Parámetros completos OpenAI/Anthropic; `/models` endpoint; normalización | En construcción |
+| **EP-011** · MVP Fixes & Completeness | LLM Handler, Adapters (OmniRoute), Logging, Metrics | Debug handlers; OmniRoute adapter; JSON logging; `/metrics` endpoint | Pendiente |
+
+### Notas arquitectónicas:
+
+1. **EP-009 es prerequisito silencioso**: Sin Sync Worker + WAL, la ruta crítica se bloquea escribiendo a DB y el SLA de < 100ms se incumple. Es parte de EP-002 (Resiliencia).
+
+2. **EP-010 vs EP-011**: 
+   - **EP-010** agrega _completitud_ de parámetros OpenAI/Anthropic para que clientes existentes (OpenCode, Free Claude Code) puedan apuntar al Gateway sin fragmentación.
+   - **EP-011** fija _handlers rotos_ (500/503/400) y agrega observabilidad operacional (logging JSON + métricas), permitiendo al equipo depurar y operar el Gateway.
+
+3. **Adapters registrados en buildAdapters()**:
+   - `openai`, `anthropic`, `google`, `openrouter`, `aihubmix`, `local`, `omniroute`
+   - La configuración YAML debe tener provider IDs coherentes con buildAdapters() (EP-011, HU-056).
+
+4. **Escalabilidad**: El diagrama C4 Nivel 2 asume una configuración de **Load Balancer L7 + N nodos del Gateway en paralelo**. El estado de cuota/auth se hidrata en arranque desde DB y se invalida vía webhook/polling (Cache Invalidator, EP-011 HU-041 diferida a Fase 2).
+
 
 ## Trade-offs Aceptados (Round 10)
 - **Quota-drift temporal por caída de nodo**: Si un nodo muere abruptamente, su consumo reciente queda en su WAL local. El balanceador enviará al usuario a otro nodo que tendrá una caché desactualizada, permitiendo un leve sobreconsumo hasta que el nodo muerto reviva y procese su WAL.
