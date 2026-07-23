@@ -9,6 +9,7 @@ import (
 
 	"api-llm-gateway/internal/adapter"
 	"api-llm-gateway/internal/failover"
+	"api-llm-gateway/internal/middleware"
 	"api-llm-gateway/internal/registry"
 )
 
@@ -44,7 +45,7 @@ func TestProcessChatLogsJSON(t *testing.T) {
 	gp := &GatewayProcessor{failover: engine}
 
 	// Test: ProcessChat with request ID in context
-	ctx := context.WithValue(context.Background(), "request_id", "test-req-123")
+	ctx := context.WithValue(context.Background(), middleware.RequestIDKey, "test-req-123")
 	req := &adapter.Request{
 		Model: "gpt-4",
 		Messages: []adapter.Message{

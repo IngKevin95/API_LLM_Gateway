@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -24,6 +23,8 @@ import (
 	apianthropic "api-llm-gateway/internal/api/anthropic"
 	apiopenai "api-llm-gateway/internal/api/openai"
 	"api-llm-gateway/internal/failover"
+	"api-llm-gateway/internal/metrics"
+	"api-llm-gateway/internal/middleware"
 	"api-llm-gateway/internal/registry"
 	"api-llm-gateway/internal/router"
 	"api-llm-gateway/internal/tokenizer"
@@ -72,26 +73,11 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
-	// HU-060: /metrics endpoint con datos operacionales (MVP: datos duros)
-	mux.HandleFunc("/metrics", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		metrics := map[string]interface{}{
-			"uptime_seconds": 3600,
-			"requests": map[string]interface{}{
-				"total":      42,
-				"by_handler": map[string]int{"openai": 30, "anthropic": 12},
-				"errors":     3,
-			},
-			"providers": map[string]interface{}{
-				"openai":     map[string]interface{}{"available": true, "last_success": "2026-07-23T13:52:08Z"},
-				"anthropic":  map[string]interface{}{"available": true, "last_error": nil},
-				"omniroute":  map[string]interface{}{"available": true, "circuit_breaker_open": false},
-			},
-			"latency": map[string]int{"p50_ms": 450, "p95_ms": 1200, "p99_ms": 2100},
-		}
-		json.NewEncoder(w).Encode(metrics)
-	})
+
+	// HU-060: /metrics endpoint con datos reales en memoria
+	metricsStore := metrics.NewInMemoryStore(10000)
+	metricsHandler := metrics.NewHandler(metricsStore)
+	mux.Handle("/metrics", metricsHandler)
 
 	// Register OpenAI-compatible endpoints (HU-012a, HU-012b, HU-012c)
 	if processor != nil {
@@ -133,9 +119,13 @@ func main() {
 		writeTimeout = 30 * time.Second
 	}
 
+	// Aplicar middleware de request ID
+	var handler http.Handler = mux
+	handler = middleware.RequestID(handler)
+
 	srv := &http.Server{
 		Addr:              ":" + port,
-		Handler:           mux,
+		Handler:           handler,
 		ReadHeaderTimeout: readHeaderTimeout,
 		WriteTimeout:      writeTimeout,
 	}

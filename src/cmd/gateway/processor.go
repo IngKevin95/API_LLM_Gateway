@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"time"
 
 	"api-llm-gateway/internal/adapter"
 	"api-llm-gateway/internal/failover"
+	"api-llm-gateway/internal/middleware"
 )
 
 // GatewayProcessor implements the Processor interface for API handlers.
@@ -32,14 +34,15 @@ func NewGatewayProcessor(fe *failover.Engine) *GatewayProcessor {
 // HU-051: Debug ProcessChat() — estructura de logging y manejo de errores
 // HU-052: Validar Router.Route() — invoca failover.Complete() que usa Router.Route()
 func (gp *GatewayProcessor) ProcessChat(ctx context.Context, req *adapter.Request) (*adapter.Response, error) {
-	reqID := ctx.Value("request_id")
+	start := time.Now()
+	reqID := middleware.FromContext(ctx)
 
 	slog.InfoContext(ctx, "request received",
 		slog.String("component", "openai-handler"),
 		slog.String("action", "request_received"),
 		slog.String("model", req.Model),
 		slog.Int("messages_count", len(req.Messages)),
-		slog.Any("request_id", reqID),
+		slog.String("request_id", reqID),
 	)
 
 	// Use "chat" as default capability (can be overridden based on request parameters in future)
@@ -50,7 +53,8 @@ func (gp *GatewayProcessor) ProcessChat(ctx context.Context, req *adapter.Reques
 			slog.String("component", "openai-handler"),
 			slog.String("action", "request_failed"),
 			slog.String("model", req.Model),
-			slog.Any("request_id", reqID),
+			slog.String("request_id", reqID),
+			slog.Int64("latency_ms", time.Since(start).Milliseconds()),
 		}
 		if provErr, ok := err.(*adapter.ProviderError); ok {
 			logFields = append(logFields, slog.Int("provider_status", provErr.Status))
@@ -67,7 +71,8 @@ func (gp *GatewayProcessor) ProcessChat(ctx context.Context, req *adapter.Reques
 		slog.String("action", "request_completed"),
 		slog.String("model", req.Model),
 		slog.Int("response_length", len(resp.Content)),
-		slog.Any("request_id", reqID),
+		slog.String("request_id", reqID),
+		slog.Int64("latency_ms", time.Since(start).Milliseconds()),
 	)
 	return &resp, nil
 }
@@ -91,14 +96,15 @@ func (gp *GatewayProcessor) ProcessChatStream(ctx context.Context, req *adapter.
 // Requiere: HU-056 normalización IDs proveedores
 // AC HU-057: (1) happy path request->adapter->embedding, (2) error provider, (3) edge model no soporta embeddings
 func (gp *GatewayProcessor) ProcessEmbedding(ctx context.Context, req *adapter.Request) (*adapter.Embedding, error) {
-	reqID := ctx.Value("request_id")
+	start := time.Now()
+	reqID := middleware.FromContext(ctx)
 
 	slog.InfoContext(ctx, "embedding request received",
 		slog.String("component", "openai-handler"),
 		slog.String("action", "embedding_request_received"),
 		slog.String("model", req.Model),
 		slog.Int("inputs_count", len(req.Input)),
-		slog.Any("request_id", reqID),
+		slog.String("request_id", reqID),
 	)
 
 	// Use "embedding" capability (dedicated adapter capability, not chat)
@@ -108,7 +114,8 @@ func (gp *GatewayProcessor) ProcessEmbedding(ctx context.Context, req *adapter.R
 			slog.String("component", "openai-handler"),
 			slog.String("action", "embedding_request_failed"),
 			slog.String("model", req.Model),
-			slog.Any("request_id", reqID),
+			slog.String("request_id", reqID),
+			slog.Int64("latency_ms", time.Since(start).Milliseconds()),
 		}
 		if provErr, ok := err.(*adapter.ProviderError); ok {
 			logFields = append(logFields, slog.Int("provider_status", provErr.Status))
@@ -125,7 +132,8 @@ func (gp *GatewayProcessor) ProcessEmbedding(ctx context.Context, req *adapter.R
 		slog.String("action", "embedding_request_completed"),
 		slog.String("model", req.Model),
 		slog.Int("vectors_count", len(emb.Vectors)),
-		slog.Any("request_id", reqID),
+		slog.String("request_id", reqID),
+		slog.Int64("latency_ms", time.Since(start).Milliseconds()),
 	)
 	return &emb, nil
 }

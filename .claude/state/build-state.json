@@ -1064,6 +1064,21 @@
         "EP-003 (Governance: quota+cost) not merged to develop yet — wiring_verified=false, journey_smoke=false, dod=false. Release 1.0 functional without it (quota/cost tracking stubbed in Fase 2). Recommendation: defer to Release 1.1 or complete in next session."
       ],
       "ready_for_tag": true
+    },
+    {
+      "name": "Release 1.1",
+      "epicas": [
+        "EP-011"
+      ],
+      "status": "pending",
+      "created_at": "2026-07-23",
+      "created_by": "releasing-a-version",
+      "notes": "EP-011 MVP Fixes & Completeness: finalización de slice con fixes de security (sanitizar logging de ProviderError) y UX (slog en handlers). Waiting Release Gate audit (6 gates: security, smell, coherence, stack_arch, ux, integration).",
+      "gates": {},
+      "gate_results": [],
+      "blockers": [],
+      "warnings": [],
+      "ready_for_tag": false
     }
   ],
   "progress_log": [
