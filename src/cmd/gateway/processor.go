@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"log"
 
 	"api-llm-gateway/internal/adapter"
 	"api-llm-gateway/internal/failover"
@@ -21,11 +22,16 @@ func NewGatewayProcessor(fe *failover.Engine) *GatewayProcessor {
 
 // ProcessChat processes a non-streaming chat request.
 func (gp *GatewayProcessor) ProcessChat(ctx context.Context, req *adapter.Request) (*adapter.Response, error) {
+	log.Printf("ProcessChat: model=%s, messages=%d", req.Model, len(req.Messages))
+
 	// Use "chat" as default capability (can be overridden based on request parameters in future)
 	resp, err := gp.failover.Complete(ctx, "chat", *req)
 	if err != nil {
+		log.Printf("ProcessChat ERROR: %v (type: %T)", err, err)
 		return nil, err
 	}
+
+	log.Printf("ProcessChat OK: content=%d chars", len(resp.Content))
 	return &resp, nil
 }
 
