@@ -51,8 +51,8 @@ func (h *Handler) HandleMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp, err := h.processor.ProcessChat(r.Context(), internalReq)
-	if err != nil {
-		http.Error(w, `{"type":"error","error":{"type":"api_error","message":"Internal server error"}}`, http.StatusInternalServerError)
+	if err != nil || resp == nil {
+		http.Error(w, `{"type":"error","error":{"type":"invalid_request_error","message":"Invalid request"}}`, http.StatusBadRequest)
 		return
 	}
 
