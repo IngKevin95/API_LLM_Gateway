@@ -120,6 +120,66 @@ func (e *Engine) Complete(ctx context.Context, capability string, req adapter.Re
 	return adapter.Response{}, &Error{Status: 502, Err: lastErr}
 }
 
+// Embed resuelve la capacidad "embedding" y prueba cada eslabón de la cadena.
+// Similar a Complete() pero para embedding requests (sin streaming).
+// HU-057: Implementar GatewayProcessor.ProcessEmbedding()
+func (e *Engine) Embed(ctx context.Context, capability string, req adapter.Request) (adapter.Embedding, error) {
+	chain, err := e.chain.Resolve(capability, tokensOf(req))
+	if err != nil {
+		return adapter.Embedding{}, err // ErrUnknownCapability / ErrNoModelsAvailable del router
+	}
+
+	var lastErr error
+	for _, m := range chain {
+		ad, ok := e.adapters[m.ProviderID]
+		if !ok {
+			log.Printf("WARN failover: sin adapter para proveedor %q, salteando", m.ProviderID)
+			continue
+		}
+		// Circuit Breaker: fast-fail (0 I/O) si el proveedor está tripped o saturado.
+		if e.Breaker != nil {
+			if !e.Breaker.Allow(m.ProviderID) {
+				lastErr = &adapter.ProviderError{Provider: m.ProviderID, Status: 503, Retryable: true, Err: errBreakerOpen}
+				continue
+			}
+		}
+		call := req
+		call.Model = m.Name
+
+		// TTFT por intento para embedding (típicamente sin timeout estricto)
+		attemptCtx := ctx
+		var cancel context.CancelFunc
+		if d := e.ttftFor(capability); d > 0 {
+			attemptCtx, cancel = context.WithTimeout(ctx, d)
+		}
+		emb, eerr := ad.Embed(attemptCtx, call)
+		if cancel != nil {
+			cancel()
+		}
+		if e.Breaker != nil {
+			e.Breaker.Release(m.ProviderID)
+		}
+		if eerr == nil {
+			return emb, nil
+		}
+		// 400 (o cualquier no-retryable): abortar sin failover.
+		var pe *adapter.ProviderError
+		if errors.As(eerr, &pe) && !pe.Retryable {
+			return adapter.Embedding{}, eerr
+		}
+		// Retryable: penaliza al proveedor (breaker) y prueba el siguiente eslabón.
+		if e.Breaker != nil {
+			e.Breaker.Trip(m.ProviderID)
+		}
+		lastErr = eerr
+	}
+
+	if lastErr == nil {
+		lastErr = errors.New("cadena vacía o sin adapters")
+	}
+	return adapter.Embedding{}, &Error{Status: 502, Err: lastErr}
+}
+
 func tokensOf(req adapter.Request) int {
 	// Estimación simple para la resolución; el tokenizador fino vive en el router.
 	n := 0
