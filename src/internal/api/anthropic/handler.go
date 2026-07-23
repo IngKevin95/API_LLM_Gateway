@@ -133,12 +133,24 @@ func (h *Handler) HandleMessages(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, internalReq *adapter.Request, model string) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
+		slog.ErrorContext(r.Context(), "streaming not supported",
+			slog.String("handler", "anthropic"),
+			slog.String("method", "messages_stream"),
+			slog.Int("status", http.StatusInternalServerError),
+		)
 		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
 		return
 	}
 
 	stream, err := h.processor.ProcessChatStream(r.Context(), internalReq)
 	if err != nil {
+		slog.ErrorContext(r.Context(), "messages stream processing failed",
+			slog.String("handler", "anthropic"),
+			slog.String("method", "messages_stream"),
+			slog.String("model", model),
+			slog.String("error_type", "provider"),
+			slog.Int("status", http.StatusInternalServerError),
+		)
 		http.Error(w, `{"type":"error","error":{"type":"api_error","message":"Internal server error"}}`, http.StatusInternalServerError)
 		return
 	}

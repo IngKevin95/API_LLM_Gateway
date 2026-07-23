@@ -46,13 +46,19 @@ func (gp *GatewayProcessor) ProcessChat(ctx context.Context, req *adapter.Reques
 	// HU-056: Normalizar IDs proveedores — config.yaml IDs usados por Router.Route()
 	resp, err := gp.failover.Complete(ctx, "chat", *req)
 	if err != nil {
-		slog.ErrorContext(ctx, "request failed",
+		logFields := []any{
 			slog.String("component", "openai-handler"),
 			slog.String("action", "request_failed"),
 			slog.String("model", req.Model),
-			slog.Any("error", err),
 			slog.Any("request_id", reqID),
-		)
+		}
+		if provErr, ok := err.(*adapter.ProviderError); ok {
+			logFields = append(logFields, slog.Int("provider_status", provErr.Status))
+			logFields = append(logFields, slog.String("provider", provErr.Provider))
+		} else {
+			logFields = append(logFields, slog.String("error_type", "internal"))
+		}
+		slog.ErrorContext(ctx, "request failed", logFields...)
 		return nil, err
 	}
 
@@ -98,13 +104,19 @@ func (gp *GatewayProcessor) ProcessEmbedding(ctx context.Context, req *adapter.R
 	// Use "embedding" capability (dedicated adapter capability, not chat)
 	emb, err := gp.failover.Embed(ctx, "embedding", *req)
 	if err != nil {
-		slog.ErrorContext(ctx, "embedding request failed",
+		logFields := []any{
 			slog.String("component", "openai-handler"),
 			slog.String("action", "embedding_request_failed"),
 			slog.String("model", req.Model),
-			slog.Any("error", err),
 			slog.Any("request_id", reqID),
-		)
+		}
+		if provErr, ok := err.(*adapter.ProviderError); ok {
+			logFields = append(logFields, slog.Int("provider_status", provErr.Status))
+			logFields = append(logFields, slog.String("provider", provErr.Provider))
+		} else {
+			logFields = append(logFields, slog.String("error_type", "internal"))
+		}
+		slog.ErrorContext(ctx, "embedding request failed", logFields...)
 		return nil, err
 	}
 

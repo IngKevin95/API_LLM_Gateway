@@ -148,12 +148,24 @@ func (h *Handler) HandleChatCompletions(w http.ResponseWriter, r *http.Request) 
 func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, internalReq *adapter.Request, model string) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
+		slog.ErrorContext(r.Context(), "streaming not supported",
+			slog.String("handler", "openai"),
+			slog.String("method", "chat_stream"),
+			slog.Int("status", http.StatusInternalServerError),
+		)
 		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
 		return
 	}
 
 	stream, err := h.processor.ProcessChatStream(r.Context(), internalReq)
 	if err != nil {
+		slog.ErrorContext(r.Context(), "chat stream processing failed",
+			slog.String("handler", "openai"),
+			slog.String("method", "chat_stream"),
+			slog.String("model", model),
+			slog.String("error_type", "provider"),
+			slog.Int("status", http.StatusInternalServerError),
+		)
 		http.Error(w, `{"error":{"message":"Internal server error","type":"server_error"}}`, http.StatusInternalServerError)
 		return
 	}
@@ -206,8 +218,17 @@ func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, internalR
 }
 
 func (h *Handler) HandleEmbeddings(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
 	var req EmbeddingRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		slog.ErrorContext(r.Context(), "embedding request decode error",
+			slog.String("handler", "openai"),
+			slog.String("method", "embeddings"),
+			slog.String("error_type", "validation"),
+			slog.String("error", err.Error()),
+			slog.Int("status", http.StatusBadRequest),
+			slog.Int64("latency_ms", time.Since(start).Milliseconds()),
+		)
 		http.Error(w, `{"error":{"message":"Invalid JSON payload","type":"invalid_request_error"}}`, http.StatusBadRequest)
 		return
 	}
@@ -225,6 +246,14 @@ func (h *Handler) HandleEmbeddings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(inputs) == 0 {
+		slog.ErrorContext(r.Context(), "embedding request missing input",
+			slog.String("handler", "openai"),
+			slog.String("method", "embeddings"),
+			slog.String("model", req.Model),
+			slog.String("error_type", "validation"),
+			slog.Int("status", http.StatusBadRequest),
+			slog.Int64("latency_ms", time.Since(start).Milliseconds()),
+		)
 		http.Error(w, `{"error":{"message":"Input is required","type":"invalid_request_error"}}`, http.StatusBadRequest)
 		return
 	}
@@ -236,6 +265,14 @@ func (h *Handler) HandleEmbeddings(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := h.processor.ProcessEmbedding(r.Context(), internalReq)
 	if err != nil || resp == nil {
+		slog.ErrorContext(r.Context(), "embedding processing failed",
+			slog.String("handler", "openai"),
+			slog.String("method", "embeddings"),
+			slog.String("model", req.Model),
+			slog.String("error_type", "provider"),
+			slog.Int("status", http.StatusServiceUnavailable),
+			slog.Int64("latency_ms", time.Since(start).Milliseconds()),
+		)
 		http.Error(w, `{"error":{"message":"No embedding provider available","type":"service_unavailable"}}`, http.StatusServiceUnavailable)
 		return
 	}
@@ -261,6 +298,14 @@ func (h *Handler) HandleEmbeddings(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(openaiResp)
+
+	slog.InfoContext(r.Context(), "embeddings completed",
+		slog.String("handler", "openai"),
+		slog.String("method", "embeddings"),
+		slog.String("model", req.Model),
+		slog.Int("status", http.StatusOK),
+		slog.Int64("latency_ms", time.Since(start).Milliseconds()),
+	)
 }
 
 func (h *Handler) HandleModels(w http.ResponseWriter, r *http.Request) {
