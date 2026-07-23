@@ -3,7 +3,9 @@ package anthropic
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
+	"time"
 
 	"api-llm-gateway/internal/adapter"
 	"api-llm-gateway/internal/dlp"
@@ -23,8 +25,18 @@ func NewHandler(p Processor) *Handler {
 }
 
 func (h *Handler) HandleMessages(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+
 	var req MessageRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		slog.ErrorContext(r.Context(), "messages request decode error",
+			slog.String("handler", "anthropic"),
+			slog.String("method", "messages"),
+			slog.String("error_type", "validation"),
+			slog.String("error", err.Error()),
+			slog.Int("status", http.StatusBadRequest),
+			slog.Int64("latency_ms", time.Since(start).Milliseconds()),
+		)
 		http.Error(w, `{"type":"error","error":{"type":"invalid_request_error","message":"Invalid JSON payload"}}`, http.StatusBadRequest)
 		return
 	}
@@ -51,7 +63,42 @@ func (h *Handler) HandleMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp, err := h.processor.ProcessChat(r.Context(), internalReq)
-	if err != nil || resp == nil {
+	if err != nil {
+		status := http.StatusInternalServerError
+		message := "Internal server error"
+
+		// Translate adapter.ProviderError to appropriate HTTP status
+		if provErr, ok := err.(*adapter.ProviderError); ok {
+			switch provErr.Status {
+			case 401:
+				status = http.StatusUnauthorized
+				message = "Unauthorized: invalid API key"
+			case 503:
+				status = http.StatusServiceUnavailable
+				message = "Service unavailable: no provider available"
+			case 504:
+				status = http.StatusGatewayTimeout
+				message = "Gateway timeout"
+			default:
+				status = http.StatusInternalServerError
+				message = "Provider error"
+			}
+		}
+
+		errResp := map[string]any{
+			"type": "error",
+			"error": map[string]string{
+				"type":    "server_error",
+				"message": message,
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		json.NewEncoder(w).Encode(errResp)
+		return
+	}
+
+	if resp == nil {
 		http.Error(w, `{"type":"error","error":{"type":"invalid_request_error","message":"Invalid request"}}`, http.StatusBadRequest)
 		return
 	}
@@ -73,6 +120,14 @@ func (h *Handler) HandleMessages(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(anthropicResp)
+
+	slog.InfoContext(r.Context(), "messages completed",
+		slog.String("handler", "anthropic"),
+		slog.String("method", "messages"),
+		slog.String("model", req.Model),
+		slog.Int("status", http.StatusOK),
+		slog.Int64("latency_ms", time.Since(start).Milliseconds()),
+	)
 }
 
 func (h *Handler) handleStream(w http.ResponseWriter, r *http.Request, internalReq *adapter.Request, model string) {

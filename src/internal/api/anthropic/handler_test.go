@@ -109,3 +109,76 @@ func TestHandleMessages_Stream(t *testing.T) {
 		t.Errorf("expected message_stop event")
 	}
 }
+
+// HU-058: Anthropic error handling — translate to correct HTTP status codes
+func TestHandleMessages_ErrorUnauthorized(t *testing.T) {
+	// API key inválida: esperado 401, no 400
+	processor := &mockProcessor{
+		err: &adapter.ProviderError{
+			Provider:  "anthropic",
+			Status:    401,
+			Retryable: false,
+			Err:       nil,
+		},
+	}
+	handler := anthropic.NewHandler(processor)
+
+	reqBody := []byte(`{"model":"claude-opus-4","messages":[{"role":"user","content":"test"}]}`)
+	req, _ := http.NewRequest("POST", "/v1/messages", bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	handler.HandleMessages(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", rr.Code)
+	}
+}
+
+func TestHandleMessages_ErrorUnavailable(t *testing.T) {
+	// No provider disponible: esperado 503, no 400
+	processor := &mockProcessor{
+		err: &adapter.ProviderError{
+			Provider:  "gateway",
+			Status:    503,
+			Retryable: true,
+			Err:       nil,
+		},
+	}
+	handler := anthropic.NewHandler(processor)
+
+	reqBody := []byte(`{"model":"claude-opus-4","messages":[{"role":"user","content":"test"}]}`)
+	req, _ := http.NewRequest("POST", "/v1/messages", bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	handler.HandleMessages(rr, req)
+
+	if rr.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d", rr.Code)
+	}
+}
+
+func TestHandleMessages_ErrorTimeout(t *testing.T) {
+	// Timeout: esperado 504, no 400
+	processor := &mockProcessor{
+		err: &adapter.ProviderError{
+			Provider:  "anthropic",
+			Status:    504,
+			Retryable: true,
+			Err:       nil,
+		},
+	}
+	handler := anthropic.NewHandler(processor)
+
+	reqBody := []byte(`{"model":"claude-opus-4","messages":[{"role":"user","content":"test"}]}`)
+	req, _ := http.NewRequest("POST", "/v1/messages", bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	rr := httptest.NewRecorder()
+	handler.HandleMessages(rr, req)
+
+	if rr.Code != http.StatusGatewayTimeout {
+		t.Fatalf("expected 504, got %d", rr.Code)
+	}
+}
