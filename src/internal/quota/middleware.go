@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
+	"api-llm-gateway/internal/adapter"
 )
 
 var ErrQuotaExceeded = errors.New("quota exceeded")

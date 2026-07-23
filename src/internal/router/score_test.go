@@ -3,7 +3,7 @@ package router
 import (
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/registry"
+	"api-llm-gateway/internal/registry"
 )
 
 // Cierra hueco 1: HU-002a AC2 rama "deshabilitado en YAML".

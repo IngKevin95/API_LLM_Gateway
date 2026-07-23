@@ -11,7 +11,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/auth"
+	"api-llm-gateway/internal/auth"
 )
 
 // Config parametriza la validación del JWT.

@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/secrets"
+	"api-llm-gateway/internal/secrets"
 )
 
 func TestEnvSecretManager_Resolve(t *testing.T) {

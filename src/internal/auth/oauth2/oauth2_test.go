@@ -10,8 +10,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/auth"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/auth/oauth2"
+	"api-llm-gateway/internal/auth"
+	"api-llm-gateway/internal/auth/oauth2"
 )
 
 func mustKey(t *testing.T) *rsa.PrivateKey {

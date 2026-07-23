@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/api/openai"
+	"api-llm-gateway/internal/adapter"
+	"api-llm-gateway/internal/api/openai"
 )
 
 // HU-012a AC1 — Happy: chat sin modelo, enruta por capacidad

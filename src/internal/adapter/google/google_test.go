@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter/google"
+	"api-llm-gateway/internal/adapter"
+	"api-llm-gateway/internal/adapter/google"
 )
 
 func geminiOKBody(text string) string {

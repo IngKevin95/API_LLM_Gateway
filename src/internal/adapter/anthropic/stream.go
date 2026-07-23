@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
+	"api-llm-gateway/internal/adapter"
 )
 
 const defaultStreamIdle = 5 * time.Second

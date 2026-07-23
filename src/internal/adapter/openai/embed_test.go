@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter/openai"
+	"api-llm-gateway/internal/adapter"
+	"api-llm-gateway/internal/adapter/openai"
 )
 
 // HU-020c AC1 — Happy: embeddings redirige a /v1/embeddings y normaliza vectores.

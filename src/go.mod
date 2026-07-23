@@ -1,4 +1,4 @@
-module github.com/IngKevin95/API_LLM_Gateway
+module api-llm-gateway
 
 go 1.22
 

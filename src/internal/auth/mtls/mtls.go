@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/auth"
+	"api-llm-gateway/internal/auth"
 )
 
 // RevocationList es una lista de certificados revocados por número de serie,

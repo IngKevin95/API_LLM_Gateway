@@ -9,8 +9,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/audit"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/wal"
+	"api-llm-gateway/internal/audit"
+	"api-llm-gateway/internal/wal"
 )
 
 // ErrDropped indica que un evento de baja prioridad se descartó por saturación.

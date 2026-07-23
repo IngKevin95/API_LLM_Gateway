@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
+	"api-llm-gateway/internal/adapter"
 )
 
 const defaultTimeout = 100 * time.Millisecond

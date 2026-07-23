@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/api/anthropic"
+	"api-llm-gateway/internal/adapter"
+	"api-llm-gateway/internal/api/anthropic"
 )
 
 // HU-013 AC1 — Happy: messages API format

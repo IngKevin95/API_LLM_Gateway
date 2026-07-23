@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
+	"api-llm-gateway/internal/adapter"
 )
 
 // Adapter habla el protocolo OpenAI /v1/chat/completions y /v1/embeddings.

@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/security/secrets"
+	"api-llm-gateway/internal/security/secrets"
 )
 
 // HU-011 AC1 — Resolución desde entorno, sin logs.

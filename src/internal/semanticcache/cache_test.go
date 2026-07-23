@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/semanticcache"
+	"api-llm-gateway/internal/semanticcache"
 )
 
 type mockVectorSearch struct {

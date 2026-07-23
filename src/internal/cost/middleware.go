@@ -3,7 +3,7 @@ package cost
 import (
 	"context"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
+	"api-llm-gateway/internal/adapter"
 )
 
 // Middleware wraps an adapter to track and record costs after execution.

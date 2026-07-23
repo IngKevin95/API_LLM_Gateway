@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter/local"
+	"api-llm-gateway/internal/adapter"
+	"api-llm-gateway/internal/adapter/local"
 )
 
 func isProviderErr(err error, target **adapter.ProviderError) bool { return errors.As(err, target) }

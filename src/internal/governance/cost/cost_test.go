@@ -3,7 +3,7 @@ package cost_test
 import (
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/governance/cost"
+	"api-llm-gateway/internal/governance/cost"
 )
 
 // HU-007 AC1 — Costo atribuido: registra costo = tokens × tarifa, atribuido a (agente, proveedor, modelo).

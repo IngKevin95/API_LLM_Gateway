@@ -5,12 +5,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/failover"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/quota"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/registry"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/router"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/tokenizer"
+	"api-llm-gateway/internal/adapter"
+	"api-llm-gateway/internal/failover"
+	"api-llm-gateway/internal/quota"
+	"api-llm-gateway/internal/registry"
+	"api-llm-gateway/internal/router"
+	"api-llm-gateway/internal/tokenizer"
 )
 
 type fakeAdapter struct {

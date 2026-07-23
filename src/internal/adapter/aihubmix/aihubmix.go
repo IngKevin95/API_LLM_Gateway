@@ -5,8 +5,8 @@ package aihubmix
 import (
 	"context"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter/openai"
+	"api-llm-gateway/internal/adapter"
+	"api-llm-gateway/internal/adapter/openai"
 )
 
 const defaultBaseURL = "https://aihubmix.com/v1"

@@ -10,9 +10,9 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/auth"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/auth/apikey"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/auth/oauth2"
+	"api-llm-gateway/internal/auth"
+	"api-llm-gateway/internal/auth/apikey"
+	"api-llm-gateway/internal/auth/oauth2"
 )
 
 // journey_smoke SS3: distintos métodos AuthN (API key, OAuth2) convergen en el

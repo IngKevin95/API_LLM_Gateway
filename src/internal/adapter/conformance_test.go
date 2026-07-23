@@ -3,10 +3,10 @@ package adapter_test
 import (
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter/anthropic"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter/local"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter/openai"
+	"api-llm-gateway/internal/adapter"
+	"api-llm-gateway/internal/adapter/anthropic"
+	"api-llm-gateway/internal/adapter/local"
+	"api-llm-gateway/internal/adapter/openai"
 )
 
 // journey_smoke SS2: los tres adapters conviven bajo el contrato Adapter

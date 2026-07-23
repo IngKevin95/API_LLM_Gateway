@@ -6,8 +6,8 @@ import (
 	"log"
 	"sort"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/registry"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/tokenizer"
+	"api-llm-gateway/internal/registry"
+	"api-llm-gateway/internal/tokenizer"
 )
 
 // ModelSource entrega el catálogo de modelos (lo satisface *registry.Registry).

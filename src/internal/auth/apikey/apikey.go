@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/auth"
+	"api-llm-gateway/internal/auth"
 )
 
 // Store mapea el hash de cada key a su identidad. No guarda la key en claro.

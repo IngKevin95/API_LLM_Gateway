@@ -3,8 +3,8 @@ package router
 import (
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/registry"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/tokenizer"
+	"api-llm-gateway/internal/registry"
+	"api-llm-gateway/internal/tokenizer"
 )
 
 // --- fuentes stub para los tests ---

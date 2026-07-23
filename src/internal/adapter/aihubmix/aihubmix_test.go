@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter/aihubmix"
+	"api-llm-gateway/internal/adapter"
+	"api-llm-gateway/internal/adapter/aihubmix"
 )
 
 // HU-029 AC1 — Chat básico exitoso

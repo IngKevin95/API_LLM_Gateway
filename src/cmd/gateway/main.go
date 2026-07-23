@@ -13,7 +13,18 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/registry"
+	"api-llm-gateway/internal/adapter"
+	adapteraihubmix "api-llm-gateway/internal/adapter/aihubmix"
+	adapteranthropc "api-llm-gateway/internal/adapter/anthropic"
+	adaptergoogle "api-llm-gateway/internal/adapter/google"
+	adapterlocal "api-llm-gateway/internal/adapter/local"
+	adapteropenai "api-llm-gateway/internal/adapter/openai"
+	apianthropic "api-llm-gateway/internal/api/anthropic"
+	apiopenai "api-llm-gateway/internal/api/openai"
+	"api-llm-gateway/internal/failover"
+	"api-llm-gateway/internal/registry"
+	"api-llm-gateway/internal/router"
+	"api-llm-gateway/internal/tokenizer"
 )
 
 func main() {
@@ -30,10 +41,26 @@ func main() {
 			cfgPath = "config.yaml"
 		}
 	}
+
+	var processor *GatewayProcessor
 	if cfgPath != "" {
-		if _, err := registry.Load(cfgPath, nil); err != nil {
+		var err error
+		reg, err := registry.Load(cfgPath, nil)
+		if err != nil {
 			log.Fatalf("registry: %v", err) // fail-fast, no arranca en estado parcial
 		}
+
+		// Build Router (EP-001)
+		rt := router.New(reg, router.StaticHealth{}, router.StaticQuota{}, tokenizer.NewHeuristic())
+
+		// Build Adapters (EP-002, EP-008)
+		adapters := buildAdapters(reg)
+
+		// Build Failover Engine (EP-002)
+		fe := failover.New(rt, adapters)
+
+		// Create Processor that uses Failover
+		processor = NewGatewayProcessor(fe)
 	} else {
 		log.Printf("WARN gateway: sin config.yaml, arrancando en modo scaffold (solo /health)")
 	}
@@ -50,9 +77,28 @@ func main() {
 		_, _ = w.Write([]byte(`{}`))
 	})
 
+	// Register OpenAI-compatible endpoints (HU-012a, HU-012b, HU-012c)
+	if processor != nil {
+		openaiHandler := apiopenai.NewHandler(processor)
+		mux.HandleFunc("POST /v1/chat/completions", openaiHandler.HandleChatCompletions)
+		mux.HandleFunc("POST /v1/embeddings", openaiHandler.HandleEmbeddings)
+
+		// Register Anthropic-compatible endpoints (HU-013, HU-016)
+		anthropicHandler := apianthropic.NewHandler(processor)
+		mux.HandleFunc("POST /v1/messages", anthropicHandler.HandleMessages)
+
+		// Register MCP integration (HU-033) — stub handler for now
+		// TODO: Full MCP integration in Fase 2
+		mux.HandleFunc("POST /mcp", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusNotImplemented)
+			_, _ = w.Write([]byte(`{"error":"MCP integration pending"}`))
+		})
+	}
+
 	var readHeaderTimeout, writeTimeout time.Duration
 	if cfgPath != "" {
-		// Re-load the config just for timeouts (since registry isn't returned globally yet in scaffold)
+		// Re-load the config just for timeouts
 		reg, err := registry.Load(cfgPath, nil)
 		if err == nil {
 			rMs, wMs := reg.ServerTimeouts()
@@ -94,4 +140,37 @@ func main() {
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Printf("shutdown: %v", err)
 	}
+}
+
+// buildAdapters constructs and returns adapters for all configured providers.
+func buildAdapters(reg *registry.Registry) map[string]adapter.Adapter {
+	adapters := make(map[string]adapter.Adapter)
+
+	// For MVP, build adapters for known provider types based on registry config.
+	// This is a simplified approach; a fuller version would introspect registry.providers dynamically.
+
+	// Manually add OpenAI adapter (always available if API key is set)
+	if key := reg.APIKey("openai"); key != "" {
+		adapters["openai"] = adapteropenai.New("https://api.openai.com/v1", key)
+	}
+
+	// Manually add Anthropic adapter
+	if key := reg.APIKey("anthropic"); key != "" {
+		adapters["anthropic"] = adapteranthropc.New("https://api.anthropic.com", key)
+	}
+
+	// Manually add Google adapter
+	if key := reg.APIKey("google"); key != "" {
+		adapters["google"] = adaptergoogle.New("", key)
+	}
+
+	// Add AIHubMix if configured
+	if key := reg.APIKey("aihubmix"); key != "" {
+		adapters["aihubmix"] = adapteraihubmix.New("https://api.aihubmix.com/v1", key)
+	}
+
+	// Add local Ollama if available (no API key needed)
+	adapters["local"] = adapterlocal.New("http://localhost:11434")
+
+	return adapters
 }

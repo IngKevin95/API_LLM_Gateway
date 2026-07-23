@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter/openai"
+	"api-llm-gateway/internal/adapter"
+	"api-llm-gateway/internal/adapter/openai"
 )
 
 func drain(t *testing.T, ts adapter.TokenStream) (string, error) {

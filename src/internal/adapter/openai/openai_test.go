@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter/openai"
+	"api-llm-gateway/internal/adapter"
+	"api-llm-gateway/internal/adapter/openai"
 )
 
 func isProviderError(err error, target **adapter.ProviderError) bool {

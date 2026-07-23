@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/ratelimit"
+	"api-llm-gateway/internal/ratelimit"
 )
 
 func ok() http.Handler {

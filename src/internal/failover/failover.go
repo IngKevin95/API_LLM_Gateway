@@ -10,8 +10,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/registry"
+	"api-llm-gateway/internal/adapter"
+	"api-llm-gateway/internal/registry"
 )
 
 // ChainResolver entrega la cadena de fallback ordenada (lo satisface *router.Router).

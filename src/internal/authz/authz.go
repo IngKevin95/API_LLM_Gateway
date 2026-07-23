@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/auth"
+	"api-llm-gateway/internal/auth"
 )
 
 // Access describe la intención de la petición a autorizar.

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/breaker"
+	"api-llm-gateway/internal/breaker"
 )
 
 // HU-004b AC2 — Edge: Max In-Flight excedido → fast-fail (Allow=false, 0 I/O).

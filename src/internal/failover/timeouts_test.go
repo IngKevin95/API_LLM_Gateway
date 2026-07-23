@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/failover"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/registry"
+	"api-llm-gateway/internal/adapter"
+	"api-llm-gateway/internal/failover"
+	"api-llm-gateway/internal/registry"
 )
 
 // slowAdapter responde tras `delay`, o falla si el ctx (TTFT) vence antes.

@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/audit"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/shutdown"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/syncworker"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/wal"
+	"api-llm-gateway/internal/audit"
+	"api-llm-gateway/internal/shutdown"
+	"api-llm-gateway/internal/syncworker"
+	"api-llm-gateway/internal/wal"
 )
 
 type mockStore struct {

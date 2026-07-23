@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter"
-	"github.com/IngKevin95/API_LLM_Gateway/internal/adapter/openrouter"
+	"api-llm-gateway/internal/adapter"
+	"api-llm-gateway/internal/adapter/openrouter"
 )
 
 // HU-031 AC1 — Headers HTTP-Referer y X-Title presentes en cada request
