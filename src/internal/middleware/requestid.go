@@ -2,11 +2,21 @@ package middleware
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
-	"math/rand"
 	"net/http"
-	"time"
+	"regexp"
 )
+
+var reqIDRegex = regexp.MustCompile(`[^a-zA-Z0-9-]`)
+
+func sanitizeRequestID(id string) string {
+	id = reqIDRegex.ReplaceAllString(id, "")
+	if len(id) > 64 {
+		id = id[:64]
+	}
+	return id
+}
 
 type contextKey string
 
@@ -17,9 +27,15 @@ func RequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Intentar extraer de header
 		requestID := r.Header.Get("X-Request-ID")
+		if requestID != "" {
+			// Sanitize: allow only alphanumeric and hyphens, truncate to 64 chars
+			requestID = sanitizeRequestID(requestID)
+		}
 		if requestID == "" {
-			// Generar un ID aleatorio simple si no existe
-			requestID = fmt.Sprintf("req-%d-%d", time.Now().UnixNano(), rand.Intn(100000))
+			// Generate a secure random ID if missing or became empty after sanitization
+			b := make([]byte, 16)
+			rand.Read(b)
+			requestID = fmt.Sprintf("req-%x", b)
 		}
 
 		// Inyectar en contexto con key tipada
