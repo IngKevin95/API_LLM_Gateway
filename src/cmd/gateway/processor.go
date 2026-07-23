@@ -92,13 +92,17 @@ func (gp *GatewayProcessor) ProcessChat(ctx context.Context, req *adapter.Reques
 		return nil, err
 	}
 
-	// HU-060: registrar métrica de éxito (provider extraído de failover, asumimos success status 200)
 	if gp.metricsStore != nil {
+		providerID := resp.ProviderID
+		if providerID == "" {
+			providerID = "unknown"
+		}
 		gp.metricsStore.Record(metrics.RequestMetric{
-			Provider:  "unknown", // ponytail: failover no retorna provider usado; futuro: modificar Complete para retornarlo
+			Provider:  providerID,
 			Model:     req.Model,
 			LatencyMs: latencyMs,
 			Status:    200,
+			Tokens:    0, // ponytail: Response no expone usage; agregar cuando adapters devuelvan tokens
 		})
 	}
 
@@ -182,13 +186,17 @@ func (gp *GatewayProcessor) ProcessEmbedding(ctx context.Context, req *adapter.R
 		return nil, err
 	}
 
-	// HU-060: registrar métrica de éxito
 	if gp.metricsStore != nil {
+		providerID := emb.ProviderID
+		if providerID == "" {
+			providerID = "unknown"
+		}
 		gp.metricsStore.Record(metrics.RequestMetric{
-			Provider:  "unknown", // ponytail: failover no retorna provider usado
+			Provider:  providerID,
 			Model:     req.Model,
 			LatencyMs: latencyMs,
 			Status:    200,
+			Tokens:    0, // ponytail: Embedding no expone usage; agregar cuando adapters devuelvan tokens
 		})
 	}
 
