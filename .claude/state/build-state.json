@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "harness_phase": "authoring",
+  "harness_phase": "active",
   "design_source": {
     "applies": true,
     "confirmed": false,
@@ -18,13 +18,19 @@
   "active_slice": {
     "epica": "EP-010",
     "titulo": "Compatibilidad Universal de Clientes (Multi-herramienta)",
-    "hus": ["HU-042", "HU-043", "HU-044", "HU-045", "HU-046", "HU-047", "HU-048"],
+    "hus": [
+      "HU-042",
+      "HU-043",
+      "HU-044",
+      "HU-045",
+      "HU-046",
+      "HU-047",
+      "HU-048"
+    ],
     "layer": "business",
-    "openspec_change": null,
-    "branch": null,
-    "phase": "tdd",
     "openspec_change": "compatibilidad-universal-clientes",
     "branch": "feature/ep-010-compatibilidad-universal",
+    "phase": "tdd",
     "gates": {
       "dor": true,
       "tdd": false,
@@ -808,7 +814,14 @@
     {
       "epica": "EP-004B",
       "titulo": "Protección de datos",
-      "hus": ["HU-010", "HU-011", "HU-026a", "HU-026b", "HU-028", "HU-034"],
+      "hus": [
+        "HU-010",
+        "HU-011",
+        "HU-026a",
+        "HU-026b",
+        "HU-028",
+        "HU-034"
+      ],
       "layer": "foundational",
       "openspec_change": "ep-004b-proteccion-datos",
       "branch": "feature/ep-004b-proteccion-datos",
@@ -823,7 +836,16 @@
   "releases": [
     {
       "name": "Release 1.0",
-      "epicas": ["EP-001", "EP-002", "EP-004A", "EP-004B", "EP-005", "EP-007", "EP-008", "EP-009"],
+      "epicas": [
+        "EP-001",
+        "EP-002",
+        "EP-004A",
+        "EP-004B",
+        "EP-005",
+        "EP-007",
+        "EP-008",
+        "EP-009"
+      ],
       "status": "passed",
       "completed_at": "2026-07-23",
       "completed_by": "releasing-a-version",
