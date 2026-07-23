@@ -179,8 +179,8 @@ func (h *Handler) HandleEmbeddings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp, err := h.processor.ProcessEmbedding(r.Context(), internalReq)
-	if err != nil {
-		http.Error(w, `{"error":{"message":"Internal server error","type":"server_error"}}`, http.StatusInternalServerError)
+	if err != nil || resp == nil {
+		http.Error(w, `{"error":{"message":"No embedding provider available","type":"service_unavailable"}}`, http.StatusServiceUnavailable)
 		return
 	}
 
