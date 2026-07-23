@@ -1,0 +1,140 @@
+# Anthropic API Parameter Specification
+# Define parameter constraints, ranges, and translation rules for Anthropic API
+apiVersion: v1
+kind: ParameterSpec
+metadata:
+  provider: anthropic
+  version: "3.0"
+  schema: "https://docs.anthropic.com/en/docs/models/model-list"
+
+parameters:
+  # Core parameters
+  model:
+    type: string
+    required: true
+    description: "Model identifier (claude-3-opus, claude-3-sonnet, etc.)"
+
+  max_tokens:
+    type: integer
+    required: true
+    minimum: 1
+    maximum: 200000
+    description: "Maximum tokens in response. REQUIRED for Anthropic (unlike OpenAI)"
+
+  # Sampling parameters
+  temperature:
+    type: number
+    required: false
+    minimum: 0.0
+    maximum: 1.0
+    default: 1.0
+    description: "Sampling temperature [0, 1]. Different from OpenAI [0, 2]"
+    note: "Anthropic range is tighter than OpenAI - auto-clamp on conversion"
+
+  top_p:
+    type: number
+    required: false
+    minimum: 0.0
+    maximum: 1.0
+    description: "Nucleus sampling threshold"
+
+  top_k:
+    type: integer
+    required: false
+    minimum: 1
+    description: "Top-K sampling (Anthropic-specific)"
+
+  # Anthropic-specific features
+  thinking:
+    type: string
+    required: false
+    enum: [enabled, disabled]
+    default: disabled
+    description: "Extended thinking mode for Claude 3.5 and later"
+    note: "Not available in OpenAI format"
+
+  tool_use:
+    type: string
+    required: false
+    enum: [auto, required, none]
+    default: auto
+    description: "Tool/function calling mode"
+
+  # Stop sequences
+  stop:
+    type: array
+    items:
+      type: string
+    description: "Stop sequences for response termination"
+
+  # Tool/Function definitions
+  tools:
+    type: array
+    items:
+      type: object
+    description: "Tool definitions (similar to OpenAI functions)"
+
+# Feature compatibility matrix
+compatibility:
+  response_format:
+    supported: false
+    note: "Use raw response and parse client-side"
+    fallback: "client-side parsing"
+
+  seed:
+    supported: false
+    note: "Anthropic does not support deterministic seeding"
+    fallback: "omit seed parameter"
+
+  presence_penalty:
+    supported: false
+    note: "Anthropic uses different penalty model"
+    fallback: "omit parameter"
+
+  frequency_penalty:
+    supported: false
+    note: "Anthropic uses different penalty model"
+    fallback: "omit parameter"
+
+  n:
+    supported: false
+    note: "Anthropic does not support multiple completions in single call"
+    fallback: "make multiple requests"
+
+# OpenAI to Anthropic parameter translation rules
+translation:
+  # Temperature range adjustment
+  temperature:
+    rule: "clamp_to_range"
+    from_range: [0.0, 2.0]  # OpenAI
+    to_range: [0.0, 1.0]     # Anthropic
+    behavior: "clamp_then_scale"  # Scale 2.0->1.0, clamp values > 1.0
+
+  # Tool choice normalization
+  tool_choice:
+    rule: "enum_mapping"
+    mappings:
+      "auto": "auto"
+      "required": "required"
+      "none": "none"
+      "any": "auto"  # OpenAI "any" maps to Anthropic "auto"
+
+  # Skip unsupported features silently
+  response_format: null
+  seed: null
+  presence_penalty: null
+  frequency_penalty: null
+  n: null
+
+# Validation rules
+validation:
+  max_tokens_required: true
+  temperature_clamp_on_out_of_range: true
+  top_k_minimum: 1
+  tool_choices_validated: true
+
+# Default parameter values
+defaults:
+  temperature: 1.0
+  thinking: disabled
+  tool_use: auto
