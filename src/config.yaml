@@ -66,10 +66,22 @@ providers:
         cost_per_1m_tokens: 0.03
         max_context_tokens: 4096
 
+  - id: omniroute
+    type: openai-compatible
+    base_url: http://omniroute:20128/v1
+    max_in_flight: 100
+    models:
+      - name: gpt-3.5-turbo
+        capabilities: [chat, coding]
+        quality_score: 65
+        latency_p50_ms: 150
+        cost_per_1m_tokens: 0
+        max_context_tokens: 4096
+
 routing:
   capabilities:
     chat:
-      providers: [aihubmix, local, openai, anthropic, google]
+      providers: [omniroute, aihubmix, local, openai, anthropic, google]
       stream_idle_timeout_ms: 5000
     reasoning:
       providers: [anthropic, openai]
