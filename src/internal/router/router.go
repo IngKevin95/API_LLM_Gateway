@@ -51,23 +51,31 @@ func (r *Router) Resolve(capability string, estimatedTokens int) ([]registry.Mod
 		return nil, ErrUnknownCapability
 	}
 
+	log.Printf("router: resolving capability=%q", capability)
+
 	var candidates []registry.Model
 	for _, m := range r.source.ModelsFor(capability) {
 		if m.Disabled {
+			log.Printf("  %s (provider=%s): disabled", m.Name, m.ProviderID)
 			continue
 		}
 		if !r.health.Healthy(m.ProviderID, m.Name) {
+			log.Printf("  %s (provider=%s): unhealthy", m.Name, m.ProviderID)
 			continue
 		}
 		if r.quota.Remaining(m.ProviderID, m.Name) <= 0 {
+			log.Printf("  %s (provider=%s): no quota", m.Name, m.ProviderID)
 			continue
 		}
 		if !r.tok.FitsWindow(estimatedTokens, m.MaxContextToks) {
+			log.Printf("  %s (provider=%s): context window too small", m.Name, m.ProviderID)
 			continue
 		}
+		log.Printf("  %s (provider=%s): candidate (quality=%d, latency=%dms)", m.Name, m.ProviderID, m.QualityScore, m.LatencyP50ms)
 		candidates = append(candidates, m)
 	}
 	if len(candidates) == 0 {
+		log.Printf("router: NO models available for capability=%q", capability)
 		return nil, ErrNoModelsAvailable
 	}
 
@@ -79,6 +87,14 @@ func (r *Router) Resolve(capability string, estimatedTokens int) ([]registry.Mod
 		}
 		return tiebreak(a, b) // empate de score: menor costo, luego alfabético
 	})
+
+	// Log routing decision
+	if len(candidates) > 0 {
+		chosen := candidates[0]
+		score := scores[chosen.Name]
+		log.Printf("router: routing decision: capability=%q, chosen_provider=%s, model=%s, score=%.2f", capability, chosen.ProviderID, chosen.Name, score)
+	}
+
 	return candidates, nil
 }
 
