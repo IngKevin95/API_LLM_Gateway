@@ -48,13 +48,15 @@ type Request struct {
 
 // Response es la respuesta normalizada de chat.
 type Response struct {
-	Content   string
-	ToolCalls []ToolCall
+	Content    string
+	ToolCalls  []ToolCall
+	ProviderID string // Injected by failover engine
 }
 
 // Embedding es la respuesta normalizada de embeddings.
 type Embedding struct {
-	Vectors [][]float64
+	Vectors    [][]float64
+	ProviderID string // Injected by failover engine
 }
 
 // TokenStream emite tokens de una respuesta en streaming.

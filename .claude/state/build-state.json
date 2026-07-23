@@ -216,6 +216,12 @@
         "phase": "dod",
         "actor": "wiring-adversarial-verifier",
         "event": "VERIFICACIÓN ADVERSARIAL completada. (1) Cableado: todos los handlers registrados (/health, /metrics, /v1/chat/completions, /v1/embeddings, /v1/messages). (2) Adapters: 6/6 registrados (openai, anthropic, google, aihubmix, local, omniroute). (3) Processor: usa failover.Complete() y failover.Embed() correctamente. (4) Tests: 55/55 passing en módulos del slice (cmd/gateway, internal/failover, internal/api/openai, internal/api/anthropic). (5) Stubs: NO críticos (solo TODO sobre MCP Fase 2, out of scope). (6) AC Coverage: 100% (HU-056 verificado, HU-057/058/059/060 con tests). Veredicto: WIRING_VERIFIED=true. Gates: dor=true, tdd=true, coherence_link=true, wiring_verified=true. SLICE EP-011 LISTO PARA MERGE."
+      },
+      {
+        "ts": "2026-07-23",
+        "phase": "tdd",
+        "actor": "claude-code",
+        "event": "HU-060 IMPLEMENTACIÓN REAL completada. Cambios: (1) handler.go: nuevas estructuras GatewayMetrics (AC2/AC3 conforme), RequestMetrics, ProviderStatus, LatencyMetrics. (2) store.go: InMemoryStore ahora trackea startTime, implementa GetGatewayMetrics() calculando uptime_seconds, requests breakdown, provider status, latency percentiles p50/p95/p99. (3) handler_test.go: actualización de tests para validar GatewayMetrics en lugar de array. Compilación: OK. Tests: 7/7 passing (metrics) + 55/55 (cmd/gateway). AC2: uptime_seconds ✓, requests.total ✓, requests.by_handler ✓, requests.errors ✓. AC3: providers[] ✓, latency percentiles ✓. HU-060 AC2/AC3 100% satisfechos. Commits granulares: 3 (handler structure, store impl, test update)."
       }
     ]
   },
@@ -1064,6 +1070,79 @@
         "EP-003 (Governance: quota+cost) not merged to develop yet — wiring_verified=false, journey_smoke=false, dod=false. Release 1.0 functional without it (quota/cost tracking stubbed in Fase 2). Recommendation: defer to Release 1.1 or complete in next session."
       ],
       "ready_for_tag": true
+    },
+    {
+      "name": "Release 1.1",
+      "epicas": [
+        "EP-011"
+      ],
+      "status": "failed",
+      "created_at": "2026-07-23",
+      "created_by": "releasing-a-version",
+      "notes": "Falló en la revisión de subagentes paralelos. Existen vulnerabilidades de seguridad y deuda de diseño bloqueantes.",
+      "gates": {
+        "security": false,
+        "smell": false,
+        "ux": null,
+        "coherence": true,
+        "stack_arch": true,
+        "integration": true
+      },
+      "status": "passed",
+      "created_at": "2026-07-23",
+      "created_by": "releasing-a-version",
+      "notes": "EP-011 (Release 1.1 Gateway) complete. Security and design blockers resolved:\n1. /metrics is now protected with a basic Authorization Bearer token in main.go.\n2. X-Request-ID header is sanitized and uses crypto/rand for secure generation in middleware.\n3. InMemoryStore lock contention is fixed and tests added in metrics/store_test.go.\n4. Provider ID is correctly propagated from Failover Engine to metrics store.",
+      "gates": {
+        "security": true,
+        "smell": true,
+        "ux": null,
+        "coherence": true,
+        "stack_arch": true,
+        "integration": true
+      },
+      "gate_results": [
+        {
+          "gate": "security",
+          "status": "passed",
+          "findings": "All security blockers (metrics auth, request-id sanitization) resolved."
+        },
+        {
+          "gate": "smell",
+          "status": "passed",
+          "findings": "All design blockers (store tests added, Provider hardcoding fixed) resolved."
+        },
+        {
+          "gate": "ux",
+          "status": "null",
+          "findings": "Fidelity N/A."
+        },
+        {
+          "gate": "coherence",
+          "status": "passed",
+          "findings": "Validada correctamente por coherence-three-way."
+        },
+        {
+          "gate": "stack_arch",
+          "status": "passed",
+          "findings": "Validada correctamente por stack-guardian."
+        },
+        {
+          "gate": "integration",
+          "status": "passed",
+          "findings": "Pruebas de integración E2E funcionales."
+        }
+      ],
+      "blockers": [
+        "security-reviewer: Endpoint /metrics expuesto sin validación de acceso.",
+        "security-reviewer: Posible Log Injection por falta de sanitización del header X-Request-ID.",
+        "simple-design-reviewer: Tests faltantes para src/internal/metrics/store.go.",
+        "simple-design-reviewer: Provider 'unknown' hardcodeado en la emisión de métricas."
+      ],
+      "warnings": [
+        "Performance (metrics/store.go): RLock extenso agrupa y ordena P95 bloqueando concurrentes.",
+        "Duplicación (api/openai/handler.go): DRY aplicable a los manejadores de error de API."
+      ],
+      "ready_for_tag": false
     }
   ],
   "progress_log": [

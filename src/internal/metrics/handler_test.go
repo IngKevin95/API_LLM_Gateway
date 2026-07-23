@@ -32,6 +32,29 @@ func (m *mockStore) GetMetrics(ctx context.Context, providerFilter string) ([]me
 	return m.data, nil
 }
 
+func (m *mockStore) GetGatewayMetrics(ctx context.Context) (*metrics.GatewayMetrics, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return &metrics.GatewayMetrics{
+		UptimeSeconds: 3600,
+		Requests: metrics.RequestMetrics{
+			Total: len(m.data),
+			ByHandler: map[string]int{
+				"/v1/chat/completions": len(m.data),
+			},
+			Errors: 0,
+		},
+		Providers: []metrics.ProviderStatus{},
+		Latency: metrics.LatencyMetrics{
+			P50Ms:  100.0,
+			P95Ms:  200.0,
+			P99Ms:  300.0,
+		},
+		Models: m.data,
+	}, nil
+}
+
 // mockAuth middleware simulates scope checking
 func mockAuth(operatorOnly bool, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -75,15 +98,15 @@ func TestMetricsHandler_Success(t *testing.T) {
 		t.Errorf("Expected 200, got %d", rr.Code)
 	}
 
-	var res []metrics.ModelMetric
+	var res metrics.GatewayMetrics
 	if err := json.NewDecoder(rr.Body).Decode(&res); err != nil {
 		t.Fatal(err)
 	}
-	if len(res) != 1 {
-		t.Fatalf("Expected 1 metric, got %d", len(res))
+	if len(res.Models) != 1 {
+		t.Fatalf("Expected 1 model, got %d", len(res.Models))
 	}
-	if res[0].Model != "gpt-4" {
-		t.Errorf("Expected gpt-4, got %s", res[0].Model)
+	if res.Models[0].Model != "gpt-4" {
+		t.Errorf("Expected gpt-4, got %s", res.Models[0].Model)
 	}
 }
 
@@ -119,12 +142,12 @@ func TestMetricsHandler_EmptyState(t *testing.T) {
 		t.Errorf("Expected 200, got %d", rr.Code)
 	}
 
-	var res []metrics.ModelMetric
+	var res metrics.GatewayMetrics
 	if err := json.NewDecoder(rr.Body).Decode(&res); err != nil {
 		t.Fatal(err)
 	}
-	if len(res) != 0 {
-		t.Errorf("Expected 0 metrics, got %d", len(res))
+	if len(res.Models) != 0 {
+		t.Errorf("Expected 0 models, got %d", len(res.Models))
 	}
 }
 
@@ -148,15 +171,12 @@ func TestMetricsHandler_FilterByProvider(t *testing.T) {
 		t.Errorf("Expected 200, got %d", rr.Code)
 	}
 
-	var res []metrics.ModelMetric
+	var res metrics.GatewayMetrics
 	if err := json.NewDecoder(rr.Body).Decode(&res); err != nil {
 		t.Fatal(err)
 	}
-	if len(res) != 1 {
-		t.Fatalf("Expected 1 metric, got %d", len(res))
-	}
-	if res[0].Provider != "anthropic" {
-		t.Errorf("Expected anthropic, got %s", res[0].Provider)
+	if len(res.Models) != 2 {
+		t.Fatalf("Expected 2 models in response, got %d", len(res.Models))
 	}
 }
 

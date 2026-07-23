@@ -4,10 +4,18 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"time"
 
 	"api-llm-gateway/internal/adapter"
 	"api-llm-gateway/internal/failover"
+	"api-llm-gateway/internal/metrics"
+	"api-llm-gateway/internal/middleware"
 )
+
+// MetricsRecorder interface para inyección de dependencia en tests
+type MetricsRecorder interface {
+	Record(m metrics.RequestMetric)
+}
 
 // GatewayProcessor implements the Processor interface for API handlers.
 // It wraps the Failover Engine to complete requests through the Router -> Failover -> Adapters pipeline.
@@ -19,12 +27,13 @@ import (
 //   HU-057: Implementar ProcessEmbedding()
 //   HU-058: Fix Anthropic /v1/messages
 type GatewayProcessor struct {
-	failover *failover.Engine
+	failover     *failover.Engine
+	metricsStore MetricsRecorder
 }
 
 // NewGatewayProcessor creates a processor from a failover engine.
-func NewGatewayProcessor(fe *failover.Engine) *GatewayProcessor {
-	return &GatewayProcessor{failover: fe}
+func NewGatewayProcessor(fe *failover.Engine, ms MetricsRecorder) *GatewayProcessor {
+	return &GatewayProcessor{failover: fe, metricsStore: ms}
 }
 
 // ProcessChat processes a non-streaming chat request.
@@ -32,28 +41,69 @@ func NewGatewayProcessor(fe *failover.Engine) *GatewayProcessor {
 // HU-051: Debug ProcessChat() — estructura de logging y manejo de errores
 // HU-052: Validar Router.Route() — invoca failover.Complete() que usa Router.Route()
 func (gp *GatewayProcessor) ProcessChat(ctx context.Context, req *adapter.Request) (*adapter.Response, error) {
-	reqID := ctx.Value("request_id")
+	start := time.Now()
+	reqID := middleware.FromContext(ctx)
 
 	slog.InfoContext(ctx, "request received",
 		slog.String("component", "openai-handler"),
 		slog.String("action", "request_received"),
 		slog.String("model", req.Model),
 		slog.Int("messages_count", len(req.Messages)),
-		slog.Any("request_id", reqID),
+		slog.String("request_id", reqID),
 	)
 
 	// Use "chat" as default capability (can be overridden based on request parameters in future)
 	// HU-056: Normalizar IDs proveedores — config.yaml IDs usados por Router.Route()
 	resp, err := gp.failover.Complete(ctx, "chat", *req)
+	latencyMs := time.Since(start).Milliseconds()
+
 	if err != nil {
-		slog.ErrorContext(ctx, "request failed",
+		provider := "unknown"
+		status := 500
+		if provErr, ok := err.(*adapter.ProviderError); ok {
+			provider = provErr.Provider
+			status = provErr.Status
+		}
+
+		// HU-060: registrar métrica de error
+		if gp.metricsStore != nil {
+			gp.metricsStore.Record(metrics.RequestMetric{
+				Provider:  provider,
+				Model:     req.Model,
+				LatencyMs: latencyMs,
+				Status:    status,
+			})
+		}
+
+		logFields := []any{
 			slog.String("component", "openai-handler"),
 			slog.String("action", "request_failed"),
 			slog.String("model", req.Model),
-			slog.Any("error", err),
-			slog.Any("request_id", reqID),
-		)
+			slog.String("request_id", reqID),
+			slog.Int64("latency_ms", latencyMs),
+		}
+		if provErr, ok := err.(*adapter.ProviderError); ok {
+			logFields = append(logFields, slog.Int("provider_status", provErr.Status))
+			logFields = append(logFields, slog.String("provider", provErr.Provider))
+		} else {
+			logFields = append(logFields, slog.String("error_type", "internal"))
+		}
+		slog.ErrorContext(ctx, "request failed", logFields...)
 		return nil, err
+	}
+
+	if gp.metricsStore != nil {
+		providerID := resp.ProviderID
+		if providerID == "" {
+			providerID = "unknown"
+		}
+		gp.metricsStore.Record(metrics.RequestMetric{
+			Provider:  providerID,
+			Model:     req.Model,
+			LatencyMs: latencyMs,
+			Status:    200,
+			Tokens:    0, // ponytail: Response no expone usage; agregar cuando adapters devuelvan tokens
+		})
 	}
 
 	slog.InfoContext(ctx, "request completed",
@@ -61,7 +111,8 @@ func (gp *GatewayProcessor) ProcessChat(ctx context.Context, req *adapter.Reques
 		slog.String("action", "request_completed"),
 		slog.String("model", req.Model),
 		slog.Int("response_length", len(resp.Content)),
-		slog.Any("request_id", reqID),
+		slog.String("request_id", reqID),
+		slog.Int64("latency_ms", latencyMs),
 	)
 	return &resp, nil
 }
@@ -85,27 +136,68 @@ func (gp *GatewayProcessor) ProcessChatStream(ctx context.Context, req *adapter.
 // Requiere: HU-056 normalización IDs proveedores
 // AC HU-057: (1) happy path request->adapter->embedding, (2) error provider, (3) edge model no soporta embeddings
 func (gp *GatewayProcessor) ProcessEmbedding(ctx context.Context, req *adapter.Request) (*adapter.Embedding, error) {
-	reqID := ctx.Value("request_id")
+	start := time.Now()
+	reqID := middleware.FromContext(ctx)
 
 	slog.InfoContext(ctx, "embedding request received",
 		slog.String("component", "openai-handler"),
 		slog.String("action", "embedding_request_received"),
 		slog.String("model", req.Model),
 		slog.Int("inputs_count", len(req.Input)),
-		slog.Any("request_id", reqID),
+		slog.String("request_id", reqID),
 	)
 
 	// Use "embedding" capability (dedicated adapter capability, not chat)
 	emb, err := gp.failover.Embed(ctx, "embedding", *req)
+	latencyMs := time.Since(start).Milliseconds()
+
 	if err != nil {
-		slog.ErrorContext(ctx, "embedding request failed",
+		provider := "unknown"
+		status := 500
+		if provErr, ok := err.(*adapter.ProviderError); ok {
+			provider = provErr.Provider
+			status = provErr.Status
+		}
+
+		// HU-060: registrar métrica de error
+		if gp.metricsStore != nil {
+			gp.metricsStore.Record(metrics.RequestMetric{
+				Provider:  provider,
+				Model:     req.Model,
+				LatencyMs: latencyMs,
+				Status:    status,
+			})
+		}
+
+		logFields := []any{
 			slog.String("component", "openai-handler"),
 			slog.String("action", "embedding_request_failed"),
 			slog.String("model", req.Model),
-			slog.Any("error", err),
-			slog.Any("request_id", reqID),
-		)
+			slog.String("request_id", reqID),
+			slog.Int64("latency_ms", latencyMs),
+		}
+		if provErr, ok := err.(*adapter.ProviderError); ok {
+			logFields = append(logFields, slog.Int("provider_status", provErr.Status))
+			logFields = append(logFields, slog.String("provider", provErr.Provider))
+		} else {
+			logFields = append(logFields, slog.String("error_type", "internal"))
+		}
+		slog.ErrorContext(ctx, "embedding request failed", logFields...)
 		return nil, err
+	}
+
+	if gp.metricsStore != nil {
+		providerID := emb.ProviderID
+		if providerID == "" {
+			providerID = "unknown"
+		}
+		gp.metricsStore.Record(metrics.RequestMetric{
+			Provider:  providerID,
+			Model:     req.Model,
+			LatencyMs: latencyMs,
+			Status:    200,
+			Tokens:    0, // ponytail: Embedding no expone usage; agregar cuando adapters devuelvan tokens
+		})
 	}
 
 	slog.InfoContext(ctx, "embedding request completed",
@@ -113,7 +205,8 @@ func (gp *GatewayProcessor) ProcessEmbedding(ctx context.Context, req *adapter.R
 		slog.String("action", "embedding_request_completed"),
 		slog.String("model", req.Model),
 		slog.Int("vectors_count", len(emb.Vectors)),
-		slog.Any("request_id", reqID),
+		slog.String("request_id", reqID),
+		slog.Int64("latency_ms", latencyMs),
 	)
 	return &emb, nil
 }
