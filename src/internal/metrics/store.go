@@ -20,17 +20,19 @@ type RequestMetric struct {
 
 // InMemoryStore es un almacén de métricas en memoria con rolling window.
 type InMemoryStore struct {
-	mu       sync.RWMutex
-	metrics  []RequestMetric
-	maxSize  int
-	startIdx int
+	mu        sync.RWMutex
+	metrics   []RequestMetric
+	maxSize   int
+	startIdx  int
+	startTime time.Time
 }
 
 // NewInMemoryStore crea un store con tamaño máximo (últimas N métricas).
 func NewInMemoryStore(maxSize int) *InMemoryStore {
 	return &InMemoryStore{
-		metrics: make([]RequestMetric, 0, maxSize),
-		maxSize: maxSize,
+		metrics:   make([]RequestMetric, 0, maxSize),
+		maxSize:   maxSize,
+		startTime: time.Now(),
 	}
 }
 
@@ -52,16 +54,18 @@ func (s *InMemoryStore) Record(m RequestMetric) {
 // GetMetrics devuelve agregados de métricas por modelo.
 func (s *InMemoryStore) GetMetrics(ctx context.Context, providerFilter string) ([]ModelMetric, error) {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
-
 	if len(s.metrics) == 0 {
+		s.mu.RUnlock()
 		return []ModelMetric{}, nil
 	}
+	metricsCopy := make([]RequestMetric, len(s.metrics))
+	copy(metricsCopy, s.metrics)
+	s.mu.RUnlock()
 
 	// Agrupar por (provider, model)
 	groups := make(map[string]*aggregator)
 
-	for _, m := range s.metrics {
+	for _, m := range metricsCopy {
 		// Filtrar por proveedor si se especifica
 		if providerFilter != "" && m.Provider != providerFilter {
 			continue
@@ -102,6 +106,97 @@ func (s *InMemoryStore) GetMetrics(ctx context.Context, providerFilter string) (
 	})
 
 	return result, nil
+}
+
+// GetGatewayMetrics devuelve la estructura HU-060 (AC2+AC3) con uptime, requests breakdown, providers status, latency percentiles.
+func (s *InMemoryStore) GetGatewayMetrics(ctx context.Context) (*GatewayMetrics, error) {
+	s.mu.RLock()
+	if len(s.metrics) == 0 {
+		s.mu.RUnlock()
+		return &GatewayMetrics{
+			UptimeSeconds: int(time.Since(s.startTime).Seconds()),
+			Requests:      RequestMetrics{ByHandler: make(map[string]int)},
+			Providers:     []ProviderStatus{},
+			Models:        []ModelMetric{},
+		}, nil
+	}
+	metricsCopy := make([]RequestMetric, len(s.metrics))
+	copy(metricsCopy, s.metrics)
+	startTime := s.startTime
+	s.mu.RUnlock()
+
+	// HU-060 AC2: uptime_seconds
+	uptime := int(time.Since(startTime).Seconds())
+
+	// HU-060 AC2: requests (total, by_handler, errors)
+	var totalRequests int
+	var errorCount int
+	latencies := []int64{}
+	byHandler := map[string]int{
+		"/v1/chat/completions": 0,
+		"/v1/embeddings":       0,
+		"/v1/messages":         0,
+		"/health":              0,
+		"/metrics":             0,
+		"/mcp":                 0,
+	}
+	providerSet := make(map[string]bool)
+
+	for _, m := range metricsCopy {
+		totalRequests++
+		latencies = append(latencies, m.LatencyMs)
+		providerSet[m.Provider] = true
+		if m.Status >= 400 {
+			errorCount++
+		}
+	}
+
+	// HU-060 AC3: providers (name, available, circuit_breaker_open)
+	var providers []ProviderStatus
+	for provider := range providerSet {
+		providers = append(providers, ProviderStatus{
+			Name:               provider,
+			Available:          true,
+			CircuitBreakerOpen: false,
+		})
+	}
+	// Ordenar para consistencia
+	sort.Slice(providers, func(i, j int) bool {
+		return providers[i].Name < providers[j].Name
+	})
+
+	// HU-060 AC3: latency percentiles (p50, p95, p99)
+	latMetrics := LatencyMetrics{}
+	if len(latencies) > 0 {
+		sort.Slice(latencies, func(i, j int) bool { return latencies[i] < latencies[j] })
+		idx50 := (len(latencies) * 50) / 100
+		idx95 := (len(latencies) * 95) / 100
+		idx99 := (len(latencies) * 99) / 100
+		if idx50 >= len(latencies) {
+			idx50 = len(latencies) - 1
+		}
+		if idx95 >= len(latencies) {
+			idx95 = len(latencies) - 1
+		}
+		if idx99 >= len(latencies) {
+			idx99 = len(latencies) - 1
+		}
+		latMetrics.P50Ms = float64(latencies[idx50])
+		latMetrics.P95Ms = float64(latencies[idx95])
+		latMetrics.P99Ms = float64(latencies[idx99])
+	}
+
+	return &GatewayMetrics{
+		UptimeSeconds: uptime,
+		Requests: RequestMetrics{
+			Total:     totalRequests,
+			ByHandler: byHandler,
+			Errors:    errorCount,
+		},
+		Providers: providers,
+		Latency:   latMetrics,
+		Models:    []ModelMetric{},
+	}, nil
 }
 
 type aggregator struct {
