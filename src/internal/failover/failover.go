@@ -100,6 +100,7 @@ func (e *Engine) Complete(ctx context.Context, capability string, req adapter.Re
 			e.Breaker.Release(m.ProviderID)
 		}
 		if cerr == nil {
+			resp.ProviderID = m.ProviderID
 			return resp, nil
 		}
 		// 400 (o cualquier no-retryable): abortar sin failover.
@@ -160,6 +161,7 @@ func (e *Engine) Embed(ctx context.Context, capability string, req adapter.Reque
 			e.Breaker.Release(m.ProviderID)
 		}
 		if eerr == nil {
+			emb.ProviderID = m.ProviderID
 			return emb, nil
 		}
 		// 400 (o cualquier no-retryable): abortar sin failover.
