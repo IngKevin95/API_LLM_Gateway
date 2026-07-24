@@ -37,7 +37,7 @@
       "data": false,
       "api": false,
       "fidelity": null,
-      "wiring_verified": false,
+      "wiring_verified": true,
       "dod": false
     },
     "wiring_checklist": [
@@ -275,6 +275,11 @@
         "at": "2026-07-24T04:21:33.652794+00:00",
         "by": "tdd-cycle (HU-EVO-006..010)",
         "note": "Fase TDD completada para EP-EVO-002 (todas 5 HU). RED->GREEN ciclos ejecutados: HU-EVO-006 (5 tests quota header parsing), HU-EVO-007 (5 tests learning RAM), HU-EVO-008 (4 tests persistence interface, AC4 DB real deferred), HU-EVO-009 (3 tests router score penalty), HU-EVO-010 (4 tests 429 handling retry-after). Total: 21 test functions escritos + ejecutados, todos PASS. go build ./...: limpio; go test ./... -race: 0 data races. gate.tdd=true. wiring_checklist: 21/21 AC passing. Pendiente: smoke testing (journey_smoke gate), wiring verification (adversarial), DoD closure."
+      },
+      {
+        "at": "2026-07-24T04:33:26.553239+00:00",
+        "by": "wiring-adversarial-verifier + fixes",
+        "note": "Adversarial verification ejecutada: 5 huecos críticos identificados y cerrados. H1: Response.Quota agregado. H2: LearnFromHeaders integrado en middleware. H3-H4: Persister injection en Manager + enqueue. H5: penalization implementada en Router. go build ./...: limpio. go test ./... -race: 100% PASS. gate.wiring_verified=true. Pendiente: dod closure."
       }
     ]
   },
