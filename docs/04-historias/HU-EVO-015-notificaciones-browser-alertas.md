@@ -4,7 +4,7 @@ titulo: Notificaciones browser cuando remaining < umbral configurable
 epica: EP-EVO-003
 prioridad: Should
 complejidad: M
-estado: draft
+estado: lista
 ---
 
 # Notificaciones browser cuando remaining < umbral configurable

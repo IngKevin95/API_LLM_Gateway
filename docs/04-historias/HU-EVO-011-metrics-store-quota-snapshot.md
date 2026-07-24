@@ -4,7 +4,7 @@ titulo: Extender metrics.Store con snapshot de cuota por proveedor/modelo
 epica: EP-EVO-003
 prioridad: Must
 complejidad: M
-estado: draft
+estado: lista
 ---
 
 # Extender metrics.Store con snapshot de cuota por proveedor/modelo
@@ -62,3 +62,7 @@ func (s *Store) GetMetrics(ctx context.Context) Metrics {
 - Extiende: `src/internal/metrics/store.go` (HU-060)
 - Usa: `src/internal/quota/manager.go` (HU-EVO-007)
 - Alimenta: HU-EVO-014 (UI React)
+
+## Change
+
+Implementado en `openspec/changes/metrics-quota-alertas-rbac`. Ver `tasks.md` para el detalle de cobertura y desviaciones documentadas.

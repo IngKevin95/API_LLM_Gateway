@@ -4,7 +4,7 @@ titulo: UI React - Dashboard de métricas con tabs (Overview, Quotas, Alerts, Pr
 epica: EP-EVO-003
 prioridad: Must
 complejidad: L
-estado: draft
+estado: lista
 ---
 
 # UI React - Dashboard de métricas con tabs

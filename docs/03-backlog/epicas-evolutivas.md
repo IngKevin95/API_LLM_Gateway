@@ -130,6 +130,12 @@ Ampliar `/metrics` para exponer desglose de cuota por proveedor y modelo (desde 
 - **HU-EVO-014** — UI React: dashboard de métricas + alertas (tabs Overview, Quotas, Alerts)
 - **HU-EVO-015** — Notificaciones browser cuando remaining < umbral
 
+### Change (SS1: HU-EVO-011/012/013)
+
+Implementado en `openspec/changes/metrics-quota-alertas-rbac` (rama
+`feature/ep-evo-003-ss1-metrics-alertas-rbac`). SS2 (HU-EVO-014/015, UI React)
+queda pendiente de su propio change.
+
 ---
 
 ## Trazabilidad y Validación

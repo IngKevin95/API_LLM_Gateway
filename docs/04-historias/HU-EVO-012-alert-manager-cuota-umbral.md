@@ -4,7 +4,7 @@ titulo: Implementar Alert Manager que genera alertas cuando remaining < umbral
 epica: EP-EVO-003
 prioridad: Should
 complejidad: M
-estado: draft
+estado: lista
 ---
 
 # Implementar Alert Manager que genera alertas cuando remaining < umbral
@@ -74,3 +74,7 @@ CREATE TABLE provider_alerts (
 - Implementa: nuevo `src/internal/alert/manager.go`
 - Usa: HU-EVO-007 (learned quota)
 - Alimenta: HU-EVO-013 (filtrado RBAC), HU-EVO-015 (notificaciones)
+
+## Change
+
+Implementado en `openspec/changes/metrics-quota-alertas-rbac`. Ver `tasks.md` para el detalle de cobertura y desviaciones documentadas.
