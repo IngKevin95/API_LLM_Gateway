@@ -28,9 +28,10 @@ type providerState struct {
 }
 
 type inMemoryManager struct {
-	mu     sync.RWMutex
-	states map[string]*providerState
-	clock  func() time.Time
+	mu        sync.RWMutex
+	states    map[string]*providerState
+	clock     func() time.Time
+	persister Persister // optional async persistence (HU-EVO-008)
 }
 
 func NewInMemoryManager() *inMemoryManager {
@@ -39,8 +40,17 @@ func NewInMemoryManager() *inMemoryManager {
 
 func NewInMemoryManagerWithClock(clock func() time.Time) *inMemoryManager {
 	return &inMemoryManager{
-		states: make(map[string]*providerState),
-		clock:  clock,
+		states:    make(map[string]*providerState),
+		clock:     clock,
+		persister: &NoPersister{}, // default: no persistence
+	}
+}
+
+func NewInMemoryManagerWithPersister(clock func() time.Time, persister Persister) *inMemoryManager {
+	return &inMemoryManager{
+		states:    make(map[string]*providerState),
+		clock:     clock,
+		persister: persister,
 	}
 }
 
@@ -215,6 +225,17 @@ func (m *inMemoryManager) LearnFromHeaders(providerID, modelID string, quota ada
 	// Learn remaining from header
 	state.learnedRemaining = &remaining
 	state.resetAt = quota.ResetAt
+
+	// Enqueue async persistence (HU-EVO-008)
+	if m.persister != nil {
+		go func() {
+			_ = m.persister.Enqueue(PersistJob{
+				ProviderID: providerID,
+				ModelID:    modelID,
+				Quota:      quota,
+			})
+		}()
+	}
 }
 
 func currentWindow(t time.Time) string {

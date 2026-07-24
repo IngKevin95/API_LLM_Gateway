@@ -51,7 +51,8 @@ type Request struct {
 type Response struct {
 	Content    string
 	ToolCalls  []ToolCall
-	ProviderID string // Injected by failover engine
+	ProviderID string    // Injected by failover engine
+	QuotaInfo  QuotaInfo // Learned quota from response headers (HU-EVO-006)
 }
 
 // Embedding es la respuesta normalizada de embeddings.
