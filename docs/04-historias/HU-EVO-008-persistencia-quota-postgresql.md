@@ -4,7 +4,7 @@ titulo: Persistencia asíncrona en PostgreSQL de learned quotas
 epica: EP-EVO-002
 prioridad: Should
 complejidad: M
-estado: draft
+estado: lista
 ---
 
 # Persistencia asíncrona en PostgreSQL de learned quotas
@@ -19,11 +19,11 @@ Como **operador del Gateway**, quiero **que Quota Manager persista los learned q
 | 2 | Happy — reinicio restaura learned | Dado que antes del crash, learned remaining = 500K | Cuando Gateway reinicia y Quota Manager carga desde DB | Entonces restaura 500K (no vuelve a quota_hint del YAML) |
 | 3 | Error — DB down no bloquea requests | Dado que PostgreSQL está caído | Cuando request llega y LearnFromHeaders() intenta persistir | Entonces falla gracefully (log warning, sigue usando RAM) sin abortar el request |
 | 4 | Edge — competencia write async | Dado que 100 requests paralelos actualizan learned quotas | Cuando async workers compiten por escribir en DB | Entonces usa UPSERT `ON CONFLICT (provider_id, model_id) DO UPDATE` para idempotencia |
-| 5 | Edge — histórico auditoria | Dado que Cerebras cambió remaining 3 veces en 1 minuto | Cuando se persiste en DB | Entonces `provider_quotas_learned` tiene 3 rows con timestamp, para auditoría |
+| 5 | Edge — última cuota aprendida persiste | Dado que Cerebras cambió remaining 3 veces en 1 minuto | Cuando cada cambio se persiste en DB | Entonces `learned_quota` refleja el último valor aprendido vía upsert por `(provider_id, model_id)`; histórico de auditoría multi-fila queda fuera de alcance de esta historia |
 
 ## Checklist INVEST
 
-- [x] Independent — depende de HU-EVO-007 (learning en RAM)
+- [x] Independent — orden de construcción intra-slice: requiere HU-EVO-007 (learning en RAM); no bloquea negociación externa ni otros equipos
 - [x] Negotiable — batch size de async writes configurable
 - [x] Valuable — auditoría + crash recovery
 - [x] Estimable — background worker + DB schema

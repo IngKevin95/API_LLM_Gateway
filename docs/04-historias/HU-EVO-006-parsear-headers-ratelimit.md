@@ -4,12 +4,12 @@ titulo: Parsear headers estándar X-RateLimit-* por adapter
 epica: EP-EVO-002
 prioridad: Must
 complejidad: M
-estado: draft
+estado: lista
 ---
 
 # Parsear headers estándar X-RateLimit-* por adapter
 
-Como **arquitecto del Gateway**, quiero **que cada adapter extraiga automáticamente X-RateLimit-Limit, Remaining, Reset del response HTTP**, para **alimentar el aprendizaje de cuota en tiempo real sin cambios de API en adapters**.
+Como **arquitecto del Gateway**, quiero **que cada adapter extraiga automáticamente X-RateLimit-Limit, Remaining, Reset del response HTTP**, para **que el Router evite enviar tráfico a proveedores casi agotados y los agentes consumidores no reciban errores 429 inesperados**.
 
 ## Criterios de aceptación (Given/When/Then)
 
@@ -23,7 +23,7 @@ Como **arquitecto del Gateway**, quiero **que cada adapter extraiga automáticam
 
 ## Checklist INVEST
 
-- [x] Independent — no toca lógica de adapters existentes, solo adición
+- [x] Independent — orden de construcción intra-slice: requiere HU-EVO-001 (adapters genéricos ya cerrada); no bloquea negociación externa ni otros equipos
 - [x] Negotiable — fallback graceful si headers ausentes
 - [x] Valuable — habilita learning sin cambios de API
 - [x] Estimable — parseo de headers + normalización

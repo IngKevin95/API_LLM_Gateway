@@ -4,12 +4,12 @@ titulo: Implementar LearnFromHeaders() en Quota Manager con actualización RAM
 epica: EP-EVO-002
 prioridad: Must
 complejidad: M
-estado: draft
+estado: lista
 ---
 
 # Implementar LearnFromHeaders() en Quota Manager con actualización RAM
 
-Como **componente del Quota Manager**, quiero **que después de cada request, se llame `LearnFromHeaders(providerID, modelID, quotaInfo)` para actualizar remaining en RAM**, para **mantener cuota fresca sin I/O a PostgreSQL en el path crítico**.
+Como **componente del Quota Manager**, quiero **que después de cada request, se llame `LearnFromHeaders(providerID, modelID, quotaInfo)` para actualizar remaining en RAM**, para **que el Router tenga datos de cuota frescos y evite fallos de rate-limit visibles para los agentes consumidores del Gateway**.
 
 ## Criterios de aceptación (Given/When/Then)
 
@@ -23,7 +23,7 @@ Como **componente del Quota Manager**, quiero **que después de cada request, se
 
 ## Checklist INVEST
 
-- [x] Independent — depende de HU-EVO-006 (headers parseados)
+- [x] Independent — orden de construcción intra-slice: requiere HU-EVO-006 (headers parseados); no bloquea negociación externa ni otros equipos
 - [x] Negotiable — threshold configurable para agotamiento
 - [x] Valuable — cuota real en RAM, sin latencia de DB
 - [x] Estimable — atomic updates + time.Now() para reset detection
