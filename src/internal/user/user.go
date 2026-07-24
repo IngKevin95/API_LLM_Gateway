@@ -12,6 +12,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/pquerna/otp/totp"
 )
 
 // Role es el rol RBAC de un usuario. admin puede administrar usuarios de
@@ -56,8 +58,9 @@ type User struct {
 // Errores de dominio expuestos al handler HTTP para mapear a códigos.
 var (
 	ErrEmailExists  = errors.New("user: email ya registrado")
-	ErrNotFound     = errors.New("user: no encontrado")
-	ErrInvalidInput = errors.New("user: entrada inválida")
+	ErrNotFound       = errors.New("user: no encontrado")
+	ErrInvalidInput   = errors.New("user: entrada inválida")
+	ErrInvalidMfaCode = errors.New("user: código mfa inválido")
 )
 
 const createUsersTableSQL = `
@@ -86,6 +89,14 @@ func NewStore(db *sql.DB) (*Store, error) {
 	defer cancel()
 	if _, err := db.ExecContext(ctx, createUsersTableSQL); err != nil {
 		return nil, fmt.Errorf("user: migración users: %w", err)
+	}
+	// Migración para MFA (agregada posterior a la creación de la tabla original)
+	alterSQL := `
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_secret TEXT;
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled BOOLEAN DEFAULT FALSE;
+	`
+	if _, err := db.ExecContext(ctx, alterSQL); err != nil {
+		return nil, fmt.Errorf("user: migración mfa columns: %w", err)
 	}
 	return &Store{db: db}, nil
 }
@@ -215,3 +226,59 @@ func (s *Store) Patch(ctx context.Context, id string, role *Role, status *Status
 // IsActive indica si el usuario puede autenticar (HU-EVO-017 AC3: suspended
 // pierde acceso inmediato; invited tampoco autentica hasta activarse).
 func (u *User) IsActive() bool { return u.Status == StatusActive }
+
+// Métodos placeholders para MfaEnroll, MfaVerify, MfaDisable.
+// Su implementación real requiere importar otp y generar secretos.
+
+// MfaEnroll inicia el proceso de enrolamiento 2FA generando un secreto y un URI.
+// El secreto se guarda en la DB pero el MFA no se activa hasta hacer MfaVerify.
+func (s *Store) MfaEnroll(ctx context.Context, userID string) (secret, uri string, err error) {
+	u, err := s.Get(ctx, userID)
+	if err != nil {
+		return "", "", err
+	}
+
+	key, err := totp.Generate(totp.GenerateOpts{
+		Issuer:      "API LLM Gateway",
+		AccountName: u.Email,
+	})
+	if err != nil {
+		return "", "", fmt.Errorf("generando totp key: %w", err)
+	}
+
+	secretStr := key.Secret()
+	uriStr := key.URL()
+
+	_, err = s.db.ExecContext(ctx, `UPDATE users SET mfa_secret = $1 WHERE id = $2`, secretStr, userID)
+	if err != nil {
+		return "", "", err
+	}
+
+	return secretStr, uriStr, nil
+}
+
+// MfaVerify valida el código y si es correcto, activa MFA para el usuario.
+func (s *Store) MfaVerify(ctx context.Context, userID, code string) error {
+	var mfaSecret sql.NullString
+	err := s.db.QueryRowContext(ctx, `SELECT mfa_secret FROM users WHERE id = $1`, userID).Scan(&mfaSecret)
+	if err != nil {
+		return err
+	}
+	if !mfaSecret.Valid || mfaSecret.String == "" {
+		return errors.New("user: no hay secreto mfa pendiente")
+	}
+
+	valid := totp.Validate(code, mfaSecret.String)
+	if !valid {
+		return ErrInvalidMfaCode
+	}
+
+	_, err = s.db.ExecContext(ctx, `UPDATE users SET mfa_enabled = TRUE WHERE id = $1`, userID)
+	return err
+}
+
+// MfaDisable desactiva el MFA del usuario y borra el secreto.
+func (s *Store) MfaDisable(ctx context.Context, userID string) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE users SET mfa_enabled = FALSE, mfa_secret = NULL WHERE id = $1`, userID)
+	return err
+}
