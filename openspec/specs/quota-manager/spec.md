@@ -1,28 +1,38 @@
+# Quota Manager Specification — Delta
+
 ## ADDED Requirements
 
-### Requirement: Inicialización de cuota desde quota_hint del YAML
-El Quota Manager SHALL inicializar `remaining` por proveedor desde el campo `quota_hint` de
-`free-tier.yaml` en boot, tratando valores `<= 0` como cuota agotada y usando un default de 1M
-tokens cuando el campo está ausente. El valor aprendido en runtime (desde headers de
-rate-limit) o restaurado desde persistencia SHALL tener precedencia sobre el `quota_hint` inicial.
-(Traza: HU-EVO-005)
+### Requirement: Learn quota from response headers
+Quota Manager SHALL expose `LearnFromHeaders(providerID, modelID, quotaInfo)` method that updates in-memory remaining quota atomically, detecting window resets and clamping negatives to 0. (HU-EVO-007)
 
-#### Scenario: Init remaining desde quota_hint YAML
-- **WHEN** Groq en `free-tier.yaml` tiene `quota_hint: 14400` y Quota Manager arranca
-- **THEN** `Remaining("groq")` devuelve 14400 sin haber realizado ninguna request
+#### Scenario: LearnFromHeaders updates remaining atomically
+- **WHEN** post-response, adapter calls `qm.LearnFromHeaders("openai", "", QuotaInfo{Remaining: 9950})`
+- **THEN** immediate `qm.Remaining("openai", "")` returns 9950; no race conditions under `go test -race`
 
-#### Scenario: Header learned sobrescribe quota_hint
-- **WHEN** el primer request a Groq devuelve header `X-RateLimit-Remaining: 14300`
-- **THEN** Quota Manager aprende ese valor y actualiza `remaining` a 14300, con precedencia sobre el `quota_hint` inicial
+#### Scenario: Reset detection and reactivation
+- **WHEN** previous `remaining=0, resetAt=yesterday`, new response has `resetAt=today` with `remaining=<new>`
+- **THEN** Manager detects reset, updates remaining, reactivates provider in Router
 
-#### Scenario: quota_hint <= 0 tratado como agotado
-- **WHEN** un proveedor tiene `quota_hint: 0` (o negativo) en `free-tier.yaml`
-- **THEN** Quota Manager lo carga como agotado (`remaining = 0`) y el Router lo excluye hasta el primer aprendizaje real
+### Requirement: Async persistence to PostgreSQL
+Quota Manager SHALL enqueue learned quotas to background worker for async DB persist without blocking response (<5ms overhead). Worker batch-writes via UPSERT. (HU-EVO-008)
 
-#### Scenario: Proveedor sin quota_hint usa default
-- **WHEN** un proveedor nuevo no tiene `quota_hint` definido en el YAML
-- **THEN** Quota Manager asume un default de 1M tokens como `remaining` inicial
+#### Scenario: Async enqueue non-blocking
+- **WHEN** LearnFromHeaders() called
+- **THEN** method enqueues job and returns immediately; DB write happens in parallel; response unblocked
 
-#### Scenario: Reinicio restaura learned quota desde PostgreSQL
-- **WHEN** antes de un reinicio se aprendió que un proveedor tiene 500M `remaining`, y el Gateway reinicia
-- **THEN** Quota Manager lee PostgreSQL y restaura 500M como `remaining`, sin volver al `quota_hint` original del YAML
+#### Scenario: Boot restore from PostgreSQL
+- **WHEN** Gateway starts, Quota Manager initializes
+- **THEN** queries `provider_quotas_learned`, restores latest learned values per provider, preferring learned over `quota_hint`
+
+## MODIFIED Requirements
+
+### Requirement: Commit confirms actual consumption and adjusts balances
+El Quota Manager SHALL accept real consumption post-execution, adjust saldos, y triggear async persistence de learned quotas si response headers indican cambio. Si response incluye QuotaInfo, llama LearnFromHeaders() automáticamente dentro de Commit().
+
+FROM: `Commit confirma el consumo real post-ejecución y ajusta saldos.`
+
+TO: `Commit() acepta consumption real, ajusta balances, y si la respuesta incluye headers de cuota, automáticamente invoca LearnFromHeaders() para aprender del servidor.`
+
+#### Scenario: Commit triggers learning
+- **WHEN** response.QuotaInfo != nil in Commit()
+- **THEN** Commit() calls LearnFromHeaders() internally before returning; learned quota updated and enqueued for persistence
