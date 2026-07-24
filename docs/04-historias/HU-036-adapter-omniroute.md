@@ -3,9 +3,15 @@ id: HU-036
 title: Integrar OmniRoute API
 epic: EP-008
 type: Should
+estado: obsoleta
+supersedida_por: HU-053
 ---
 
 # HU-036: Integrar OmniRoute API
+
+> **Obsoleta**: duplicada de [HU-053](HU-053.md) (adaptador OmniRoute), que cubre el mismo alcance
+> y tiene implementación real en `src/internal/adapter/omniroute/`. Se conserva este archivo solo
+> por trazabilidad histórica hacia EP-008; no construir contra esta historia.
 
 ## INVEST
 - [x] Independent: el adapter funciona bajo la abstracción de enrutamiento ya implementada.
