@@ -1,8 +1,14 @@
 export default function Alerts({ alerts }) {
   const list = alerts || [];
+  const criticalCount = list.filter((a) => a.severity === 'critical').length;
+  const warningCount = list.filter((a) => a.severity !== 'critical').length;
 
   return (
     <section data-testid="alerts-tab" aria-label="Alerts">
+      <div className="alert-summary" data-testid="alert-summary">
+        <span className="badge badge-red">{criticalCount} criticas</span>
+        <span className="badge badge-yellow">{warningCount} warnings</span>
+      </div>
       <table className="mono-table" aria-label="Lista de alertas">
         <thead>
           <tr>

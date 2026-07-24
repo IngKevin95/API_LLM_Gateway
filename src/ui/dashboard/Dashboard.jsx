@@ -21,9 +21,15 @@ export default function Dashboard() {
     <div className="gateway-ops-dark" data-testid="dashboard-root">
       <header className="dashboard-header">
         <h1>API LLM Gateway — Dashboard</h1>
-        <button type="button" onClick={() => setSettingsOpen(true)} data-testid="open-settings">
-          Settings
-        </button>
+        <div className="header-actions">
+          <span className="refresh-indicator" data-testid="refresh-indicator" title="Los datos se refrescan automaticamente cada 5s">
+            <span className="refresh-dot" aria-hidden="true" />
+            auto-refresh: 5s
+          </span>
+          <button type="button" onClick={() => setSettingsOpen(true)} data-testid="open-settings">
+            Settings
+          </button>
+        </div>
       </header>
 
       <nav className="tabs" role="tablist" aria-label="Dashboard tabs">
