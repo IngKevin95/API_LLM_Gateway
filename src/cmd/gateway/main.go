@@ -29,6 +29,7 @@ import (
 	adapteropenai "api-llm-gateway/internal/adapter/openai"
 	"api-llm-gateway/internal/alert"
 	apianthropic "api-llm-gateway/internal/api/anthropic"
+	apimcp "api-llm-gateway/internal/api/mcp"
 	apiopenai "api-llm-gateway/internal/api/openai"
 	"api-llm-gateway/internal/auth"
 	"api-llm-gateway/internal/auth/apikey"
@@ -69,9 +70,11 @@ func main() {
 	var processor *GatewayProcessor
 	var alertDB *sql.DB
 	var metricsHandlerCapabilityLookup func(provider, model string) []string
+	var reg *registry.Registry
+	var pgPersister *quota.PostgresPersister
 	if cfgPath != "" {
 		var err error
-		reg, err := registry.Load(cfgPath, nil)
+		reg, err = registry.Load(cfgPath, nil)
 		if err != nil {
 			log.Fatalf("registry: %v", err) // fail-fast, no arranca en estado parcial
 		}
@@ -102,7 +105,8 @@ func main() {
 		// memoria (AC3: la persistencia nunca debe tumbar el boot).
 		qm := quota.NewInMemoryManager()
 		if dsn := os.Getenv("GATEWAY_QUOTA_POSTGRES_DSN"); dsn != "" {
-			pgPersister, err := quota.NewPostgresPersister(dsn, 1000)
+			var err error
+			pgPersister, err = quota.NewPostgresPersister(dsn, 1000)
 			if err != nil {
 				log.Printf("WARN gateway: quota postgres persister no disponible, sigue solo en RAM: %v", err)
 			} else {
@@ -340,13 +344,13 @@ func main() {
 		anthropicHandler := apianthropic.NewHandler(processor)
 		mux.HandleFunc("POST /v1/messages", anthropicHandler.HandleMessages)
 
-		// Register MCP integration (HU-033) — stub handler for now
-		// TODO: Full MCP integration in Fase 2
-		mux.HandleFunc("POST /mcp", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusNotImplemented)
-			_, _ = w.Write([]byte(`{"error":"MCP integration pending"}`))
-		})
+		// Register Universal Compatibility endpoint (HU-EVO-006)
+		responsesHandler := handler.NewResponsesHandler(processor)
+		mux.Handle("POST /responses", responsesHandler)
+
+		// Register MCP integration (HU-033)
+		mcpHandler := apimcp.NewHandler(os.Getenv("GATEWAY_ADMIN_TOKEN"), reg)
+		mux.Handle("POST /mcp", mcpHandler)
 	}
 
 	var readHeaderTimeout, writeTimeout time.Duration
@@ -396,6 +400,13 @@ func main() {
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Printf("shutdown: %v", err)
+	}
+	if pgPersister != nil {
+		if err := pgPersister.Close(); err != nil {
+			log.Printf("quota persister close: %v", err)
+		} else {
+			log.Printf("INFO gateway: quota persister flushed and closed")
+		}
 	}
 }
 
