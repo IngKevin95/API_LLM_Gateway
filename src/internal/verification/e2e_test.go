@@ -331,7 +331,7 @@ func TestThroughputCapacity(t *testing.T) {
 func TestHandlerIntegration(t *testing.T) {
 	// Note: actual HTTP testing would need mock server
 	// This verifies handler creation doesn't panic
-	responsesHandler := handler.NewResponsesHandler()
+	responsesHandler := handler.NewResponsesHandler(nil)
 	modelsHandler := handler.NewModelsHandler()
 
 	if responsesHandler == nil || modelsHandler == nil {

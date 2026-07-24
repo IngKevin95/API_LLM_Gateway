@@ -1,22 +1,31 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
+	"api-llm-gateway/internal/adapter"
 	"api-llm-gateway/internal/middleware"
 	"api-llm-gateway/internal/router"
 )
 
+// Processor maneja la lógica de negocio subyacente.
+type Processor interface {
+	ProcessChat(ctx context.Context, req *adapter.Request) (*adapter.Response, error)
+}
+
 // ResponsesHandler implements universal /responses endpoint
 type ResponsesHandler struct {
+	processor  Processor
 	detector   *middleware.FormatDetector
 	normalizer *middleware.Normalizer
 }
 
 // NewResponsesHandler creates a new /responses endpoint handler
-func NewResponsesHandler() *ResponsesHandler {
+func NewResponsesHandler(p Processor) *ResponsesHandler {
 	return &ResponsesHandler{
+		processor:  p,
 		detector:   middleware.NewFormatDetector(),
 		normalizer: middleware.NewNormalizer(),
 	}
@@ -70,12 +79,38 @@ func (h *ResponsesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_, capability = router.ExtractCapabilityPrefix(model)
 	}
 
+	// Convert normalized messages to adapter format
+	adapterReq := &adapter.Request{
+		Model: model,
+	}
+	for _, m := range normalized.Messages {
+		role, _ := m["role"].(string)
+		content, _ := m["content"].(string)
+		if role == "" {
+			role = "user"
+		}
+		if text, ok := m["text"].(string); ok && content == "" {
+			content = text
+		}
+		adapterReq.Messages = append(adapterReq.Messages, adapter.Message{
+			Role:    role,
+			Content: content,
+		})
+	}
+
 	// Route to appropriate provider (fallback chain)
-	// For now, return a 200 OK stub
+	resp, err := h.processor.ProcessChat(r.Context(), adapterReq)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "Provider error", err)
+		return
+	}
+
+	// Format response back to universal format
 	response := map[string]interface{}{
 		"status":     "ok",
 		"capability": capability,
-		"model":      model,
+		"model":      resp.ProviderID,
+		"content":    resp.Content,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
