@@ -156,7 +156,7 @@ func TestEP008_NoSharedState_Between_Adapters(t *testing.T) {
 		// Todos reciben la misma entrada, pero cada uno la traduce según su proveedor nativo.
 		// Sin servidor real, la llamada fallará, pero no debe panic.
 		_, err := ad.Chat(context.Background(), adapter.Request{
-			Model: "test",
+			Model:    "test",
 			Messages: []adapter.Message{{Role: "user", Content: "test"}},
 		})
 		// Esperamos error de conexión (no servidor), pero no panic.

@@ -11,12 +11,12 @@ func TestAnthropicParameterValidator_ValidTemperature(t *testing.T) {
 		temp  float64
 		valid bool
 	}{
-		{0.0, true},      // minimum
-		{0.5, true},      // mid-range
-		{1.0, true},      // maximum
-		{-0.1, false},    // below minimum
-		{1.1, false},     // above maximum
-		{0.8, true},      // typical value
+		{0.0, true},   // minimum
+		{0.5, true},   // mid-range
+		{1.0, true},   // maximum
+		{-0.1, false}, // below minimum
+		{1.1, false},  // above maximum
+		{0.8, true},   // typical value
 	}
 
 	for _, tt := range tests {
@@ -35,10 +35,10 @@ func TestAnthropicParameterValidator_ValidTopK(t *testing.T) {
 		valid bool
 	}{
 		{1, true},
-		{40, true},        // typical value
-		{256, true},       // high value
-		{0, false},        // must be positive
-		{-1, false},       // negative
+		{40, true},  // typical value
+		{256, true}, // high value
+		{0, false},  // must be positive
+		{-1, false}, // negative
 	}
 
 	for _, tt := range tests {
@@ -68,9 +68,9 @@ func TestAnthropicParameterValidator_ValidMaxTokens(t *testing.T) {
 		{1, true},
 		{100, true},
 		{4096, true},
-		{200000, true},      // typical for Claude 3
-		{0, false},          // must be positive
-		{-1, false},         // negative
+		{200000, true}, // typical for Claude 3
+		{0, false},     // must be positive
+		{-1, false},    // negative
 	}
 
 	for _, tt := range tests {
@@ -131,11 +131,11 @@ func TestAnthropicParameterValidator_ClampTemperature(t *testing.T) {
 		input    float64
 		expected float64
 	}{
-		{0.5, 0.5},      // in range
-		{-1.0, 0.0},     // clamp to min
-		{2.0, 1.0},      // clamp to max
-		{0.0, 0.0},      // boundary
-		{1.0, 1.0},      // boundary
+		{0.5, 0.5},  // in range
+		{-1.0, 0.0}, // clamp to min
+		{2.0, 1.0},  // clamp to max
+		{0.0, 0.0},  // boundary
+		{1.0, 1.0},  // boundary
 	}
 
 	for _, tt := range tests {
@@ -178,8 +178,8 @@ func TestAnthropicParameterValidator_OutOfRangeParameters(t *testing.T) {
 	validator := NewAnthropicParameterValidator()
 
 	params := map[string]interface{}{
-		"temperature": 2.0,  // out of range [0, 1]
-		"top_k":       0,    // invalid (must be >= 1)
+		"temperature": 2.0, // out of range [0, 1]
+		"top_k":       0,   // invalid (must be >= 1)
 		"max_tokens":  4096,
 	}
 
@@ -193,8 +193,8 @@ func TestAnthropicParameterValidator_UnknownParameters(t *testing.T) {
 	validator := NewAnthropicParameterValidator()
 
 	params := map[string]interface{}{
-		"temperature":   0.7,
-		"unknown_param": "value",
+		"temperature":     0.7,
+		"unknown_param":   "value",
 		"another_unknown": 123,
 	}
 
@@ -213,7 +213,7 @@ func TestAnthropicParameterValidator_UnsupportedFeatureFallback(t *testing.T) {
 
 	// Some OpenAI features might not be supported by Anthropic
 	params := map[string]interface{}{
-		"response_format": "json_object",  // might need fallback
+		"response_format": "json_object", // might need fallback
 		"temperature":     0.7,
 		"max_tokens":      2048,
 	}

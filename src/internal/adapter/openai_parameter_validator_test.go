@@ -11,14 +11,14 @@ func TestOpenAIParameterValidator_ValidTemperature(t *testing.T) {
 		temp  float64
 		valid bool
 	}{
-		{0.0, true},      // minimum
-		{0.5, true},      // mid-range
-		{1.0, true},      // middle
-		{1.5, true},      // high
-		{2.0, true},      // maximum
-		{-0.1, false},    // below minimum
-		{2.1, false},     // above maximum
-		{3.0, false},     // way above
+		{0.0, true},   // minimum
+		{0.5, true},   // mid-range
+		{1.0, true},   // middle
+		{1.5, true},   // high
+		{2.0, true},   // maximum
+		{-0.1, false}, // below minimum
+		{2.1, false},  // above maximum
+		{3.0, false},  // way above
 	}
 
 	for _, tt := range tests {
@@ -36,12 +36,12 @@ func TestOpenAIParameterValidator_ValidTopP(t *testing.T) {
 		topP  float64
 		valid bool
 	}{
-		{0.0, true},      // minimum
-		{0.5, true},      // mid-range
-		{1.0, true},      // maximum
-		{-0.1, false},    // below minimum
-		{1.1, false},     // above maximum
-		{0.95, true},     // typical value
+		{0.0, true},   // minimum
+		{0.5, true},   // mid-range
+		{1.0, true},   // maximum
+		{-0.1, false}, // below minimum
+		{1.1, false},  // above maximum
+		{0.95, true},  // typical value
 	}
 
 	for _, tt := range tests {
@@ -62,9 +62,9 @@ func TestOpenAIParameterValidator_ValidSeed(t *testing.T) {
 		{0, true},
 		{1, true},
 		{12345, true},
-		{2147483647, true},  // max int32
-		{-1, false},         // negative
-		{-100, false},       // negative
+		{2147483647, true}, // max int32
+		{-1, false},        // negative
+		{-100, false},      // negative
 	}
 
 	for _, tt := range tests {
@@ -86,8 +86,8 @@ func TestOpenAIParameterValidator_ValidToolChoice(t *testing.T) {
 		{"auto", true},
 		{"required", true},
 		{"invalid", false},
-		{"NONE", false},     // case-sensitive
-		{"", false},         // empty
+		{"NONE", false}, // case-sensitive
+		{"", false},     // empty
 	}
 
 	for _, tt := range tests {
@@ -108,8 +108,8 @@ func TestOpenAIParameterValidator_ValidResponseFormat(t *testing.T) {
 		{"text", true},
 		{"json_object", true},
 		{"invalid_format", false},
-		{123, false},        // wrong type
-		{nil, true},         // nil is valid (means use default)
+		{123, false}, // wrong type
+		{nil, true},  // nil is valid (means use default)
 	}
 
 	for _, tt := range tests {
@@ -127,11 +127,11 @@ func TestOpenAIParameterValidator_ClampTemperature(t *testing.T) {
 		input    float64
 		expected float64
 	}{
-		{0.5, 0.5},      // in range
-		{-1.0, 0.0},     // clamp to min
-		{3.0, 2.0},      // clamp to max
-		{0.0, 0.0},      // boundary
-		{2.0, 2.0},      // boundary
+		{0.5, 0.5},  // in range
+		{-1.0, 0.0}, // clamp to min
+		{3.0, 2.0},  // clamp to max
+		{0.0, 0.0},  // boundary
+		{2.0, 2.0},  // boundary
 	}
 
 	for _, tt := range tests {
@@ -149,9 +149,9 @@ func TestOpenAIParameterValidator_ClampTopP(t *testing.T) {
 		input    float64
 		expected float64
 	}{
-		{0.5, 0.5},      // in range
-		{-0.5, 0.0},     // clamp to min
-		{1.5, 1.0},      // clamp to max
+		{0.5, 0.5},  // in range
+		{-0.5, 0.0}, // clamp to min
+		{1.5, 1.0},  // clamp to max
 	}
 
 	for _, tt := range tests {
@@ -180,8 +180,8 @@ func TestOpenAIParameterValidator_ValidateMapParameters(t *testing.T) {
 
 	// Invalid parameters
 	invalidParams := map[string]interface{}{
-		"temperature": 5.0,  // out of range
-		"top_p":       1.5,  // out of range
+		"temperature": 5.0, // out of range
+		"top_p":       1.5, // out of range
 		"tool_choice": "invalid",
 	}
 
@@ -195,8 +195,8 @@ func TestOpenAIParameterValidator_UnknownParametersLogged(t *testing.T) {
 	validator := NewOpenAIParameterValidator()
 
 	params := map[string]interface{}{
-		"temperature": 0.7,
-		"unknown_param": "value",
+		"temperature":     0.7,
+		"unknown_param":   "value",
 		"another_unknown": 123,
 	}
 

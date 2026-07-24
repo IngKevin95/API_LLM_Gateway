@@ -28,12 +28,12 @@
     "layer": "business",
     "openspec_change": "learning-cuota-headers-persistencia",
     "branch": "feature/ep-evo-002-learning-cuota",
-    "phase": "change",
+    "phase": "tdd",
     "gates": {
       "dor": true,
       "tdd": false,
       "journey_smoke": false,
-      "coherence_link": false,
+      "coherence_link": true,
       "data": false,
       "api": false,
       "fidelity": null,
@@ -255,6 +255,11 @@
         "at": "2026-07-24T03:56:44.276286+00:00Z",
         "by": "dor-dod-gatekeeper",
         "note": "DoR cerrado para EP-EVO-002: 5 HU (HU-EVO-006..010) con AC en G/W/T (5 escenarios happy/error/edge) y INVEST 6/6. Observacion menor: HU-EVO-009 estimacion 0.5d sospechosa vs AC complejos — validar en TDD. Fase avanza a 'change'."
+      },
+      {
+        "at": "2026-07-24T04:06:33.155242+00:00Z",
+        "by": "opsx:continue",
+        "note": "Fase 'change' completada: openspec new change 'learning-cuota-headers-persistencia' creado con 4/4 artefactos. proposal.md (why/what/capabilities/impact), design.md (6 decisiones arquitectónicas + risks), specs/ (3 nuevas capacidades + 3 deltas de modificadas), tasks.md (60+ checkboxes). gate coherence_link=true. phase avanza a 'tdd'. Pendiente: ciclo TDD para las 5 HU."
       }
     ]
   },
