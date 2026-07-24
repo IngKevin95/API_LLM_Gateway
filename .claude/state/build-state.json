@@ -60,7 +60,7 @@
           "HU-EVO-020"
         ],
         "status": "blocked",
-        "blocked_reason": "Secuencial: se abre solo tras SS1 en done (1 slice a la vez)"
+        "blocked_reason": "SS1 completo (gates dor/tdd/journey_smoke/coherence_link/data/api/wiring_verified/dod=true) y en PR #48 (feature/ep-evo-004-users-rbac-security -> develop), pendiente de aprobacion/merge explicito del usuario. Se desbloquea recien cuando el PR se mergee (regla secuencial: un solo slice a la vez)."
       },
       {
         "id": "EP-EVO-004-SS3",
