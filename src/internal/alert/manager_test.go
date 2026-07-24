@@ -86,7 +86,7 @@ func TestCheck_WithoutDB_NoOp(t *testing.T) {
 func TestClassify_MultipleModelsPerProvider_IndependentPerModel(t *testing.T) {
 	m := &Manager{threshold: DefaultThreshold}
 	entries := []QuotaEntry{
-		{Provider: "mistral", Model: "small", Limit: 1000, Remaining: 900},  // ok
+		{Provider: "mistral", Model: "small", Limit: 1000, Remaining: 900}, // ok
 		{Provider: "mistral", Model: "medium", Limit: 1000, Remaining: 50}, // warning
 		{Provider: "mistral", Model: "large", Limit: 1000, Remaining: 0},   // critical
 	}

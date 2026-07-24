@@ -11,38 +11,38 @@ import (
 
 // HU-060 AC2: uptime + requests breakdown
 type RequestMetrics struct {
-	Total      int `json:"total"`
-	ByHandler  map[string]int `json:"by_handler"`
-	Errors     int `json:"errors"`
+	Total     int            `json:"total"`
+	ByHandler map[string]int `json:"by_handler"`
+	Errors    int            `json:"errors"`
 }
 
 // HU-060 AC3: provider status
 type ProviderStatus struct {
-	Name                string `json:"name"`
-	Available           bool   `json:"available"`
-	LastSuccess         string `json:"last_success,omitempty"`
-	CircuitBreakerOpen  bool   `json:"circuit_breaker_open"`
+	Name               string `json:"name"`
+	Available          bool   `json:"available"`
+	LastSuccess        string `json:"last_success,omitempty"`
+	CircuitBreakerOpen bool   `json:"circuit_breaker_open"`
 }
 
 // HU-060 AC3: latency percentiles
 type LatencyMetrics struct {
-	P50Ms  float64 `json:"p50_ms"`
-	P95Ms  float64 `json:"p95_ms"`
-	P99Ms  float64 `json:"p99_ms"`
+	P50Ms float64 `json:"p50_ms"`
+	P95Ms float64 `json:"p95_ms"`
+	P99Ms float64 `json:"p99_ms"`
 }
 
 // HU-060: Gateway Metrics response structure (AC2+AC3)
 type GatewayMetrics struct {
-	UptimeSeconds int                `json:"uptime_seconds"`
-	Requests      RequestMetrics     `json:"requests"`
-	Providers     []ProviderStatus   `json:"providers"`
-	Latency       LatencyMetrics     `json:"latency"`
-	Models        []ModelMetric      `json:"models"`
+	UptimeSeconds int              `json:"uptime_seconds"`
+	Requests      RequestMetrics   `json:"requests"`
+	Providers     []ProviderStatus `json:"providers"`
+	Latency       LatencyMetrics   `json:"latency"`
+	Models        []ModelMetric    `json:"models"`
 	// Quota (HU-EVO-011) expone el desglose de cuota remanente por
 	// proveedor/modelo, leído en vivo de quota.Manager.Snapshot() en cada
 	// request (sin cache). Filtrado por scope del requester cuando no es
 	// admin (AC5).
-	Quota         []QuotaSnapshot    `json:"quota,omitempty"`
+	Quota []QuotaSnapshot `json:"quota,omitempty"`
 }
 
 // QuotaSnapshot es la proyección pública (JSON) de quota.Snapshot para
@@ -103,9 +103,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if metrics == nil {
 		metrics = &GatewayMetrics{
-			Requests: RequestMetrics{ByHandler: make(map[string]int)},
+			Requests:  RequestMetrics{ByHandler: make(map[string]int)},
 			Providers: []ProviderStatus{},
-			Models: []ModelMetric{},
+			Models:    []ModelMetric{},
 		}
 	}
 	metrics.Quota = h.filterQuota(r.Context(), metrics.Quota)

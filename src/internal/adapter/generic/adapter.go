@@ -25,7 +25,7 @@ const (
 	FormatOpenAI = "openai"
 	FormatClaude = "claude"
 
-	defaultClaudeMaxTokens = 4096
+	defaultClaudeMaxTokens  = 4096
 	defaultAnthropicVersion = "2023-06-01"
 )
 
@@ -36,8 +36,8 @@ var ErrInvalidProviderSpec = errors.New("generic: provider spec inválido")
 // ProviderSpec declara cómo hablar con un proveedor OpenAI/Claude-compatible.
 type ProviderSpec struct {
 	BaseURL    string
-	AuthHeader string // header de autenticación, ej. "Authorization" o "x-api-key"; default "Authorization"
-	Format     string // "openai" | "claude"
+	AuthHeader string            // header de autenticación, ej. "Authorization" o "x-api-key"; default "Authorization"
+	Format     string            // "openai" | "claude"
 	Headers    map[string]string // headers extra, no puede sobrescribir AuthHeader
 	TimeoutMs  int               // timeout propio del adapter; 0 usa el default del http.Client
 }

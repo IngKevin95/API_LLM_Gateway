@@ -51,7 +51,7 @@ func TestRecorder_RecordAsync(t *testing.T) {
 	}
 
 	time.Sleep(10 * time.Millisecond) // Wait for async
-	
+
 	mp.mu.Lock()
 	defer mp.mu.Unlock()
 	if len(mp.events) != 1 {

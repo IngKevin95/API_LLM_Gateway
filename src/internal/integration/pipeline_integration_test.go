@@ -71,7 +71,7 @@ func TestPipeline_RouterToAnthropicMapper(t *testing.T) {
 	mapper := adapter.NewAnthropicParameterMapper()
 
 	params := map[string]interface{}{
-		"temperature": 1.5,  // Will be clamped to 1.0
+		"temperature": 1.5, // Will be clamped to 1.0
 		"top_k":       40,
 		"max_tokens":  2048,
 	}
@@ -133,9 +133,9 @@ func TestPipeline_EndToEnd_AnthropicPath(t *testing.T) {
 	mapper := adapter.NewAnthropicParameterMapper()
 
 	rawReq := map[string]interface{}{
-		"model":    "claude-3-opus",
-		"messages": []map[string]string{{"role": "user", "content": "hello"}},
-		"thinking": "enabled",
+		"model":      "claude-3-opus",
+		"messages":   []map[string]string{{"role": "user", "content": "hello"}},
+		"thinking":   "enabled",
 		"max_tokens": 4096,
 	}
 
@@ -172,13 +172,13 @@ func TestPipeline_EndToEnd_AnthropicPath(t *testing.T) {
 func TestPipeline_ParameterTranslation_OpenAIToAnthropic(t *testing.T) {
 	// OpenAI request with Anthropic-incompatible parameters
 	openaiReq := map[string]interface{}{
-		"model":             "gpt-4",
-		"messages":          []map[string]string{{"role": "user", "content": "hello"}},
-		"temperature":       1.5,  // OpenAI range, will clamp to Anthropic [0,1]
-		"response_format":   "json_object",  // Not supported by Anthropic
-		"seed":              42,  // Not supported by Anthropic
-		"presence_penalty":  0.5, // Not supported by Anthropic
-		"max_tokens":        2048,
+		"model":            "gpt-4",
+		"messages":         []map[string]string{{"role": "user", "content": "hello"}},
+		"temperature":      1.5,           // OpenAI range, will clamp to Anthropic [0,1]
+		"response_format":  "json_object", // Not supported by Anthropic
+		"seed":             42,            // Not supported by Anthropic
+		"presence_penalty": 0.5,           // Not supported by Anthropic
+		"max_tokens":       2048,
 	}
 
 	detector := middleware.NewFormatDetector()
@@ -266,10 +266,10 @@ func TestPipeline_CapabilityRouting_EmbeddingDetection(t *testing.T) {
 func TestPipeline_CapabilityRouting_ReasoningDetection(t *testing.T) {
 	// Reasoning request (Responses API format)
 	reasoningReq := map[string]interface{}{
-		"model":             "router:reasoning",
-		"messages":          []map[string]string{{"role": "user", "content": "solve this hard problem"}},
-		"reasoning_effort":  "high",
-		"max_tokens":        10000,
+		"model":            "router:reasoning",
+		"messages":         []map[string]string{{"role": "user", "content": "solve this hard problem"}},
+		"reasoning_effort": "high",
+		"max_tokens":       10000,
 	}
 
 	// Should infer reasoning capability
@@ -286,8 +286,8 @@ func TestPipeline_ErrorPropagation(t *testing.T) {
 
 	// Invalid parameters
 	invalidParams := map[string]interface{}{
-		"temperature": 5.0,  // Out of range
-		"top_p":       1.5,  // Out of range
+		"temperature": 5.0, // Out of range
+		"top_p":       1.5, // Out of range
 	}
 
 	warnings := mapper.GetValidationWarnings(invalidParams)

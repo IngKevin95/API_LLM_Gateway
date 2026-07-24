@@ -66,8 +66,8 @@ func TestFallback_AllPrimaryProvidersDownUsesAlternative(t *testing.T) {
 
 	health := &SelectiveHealthSource{
 		unhealthyModels: map[string]bool{
-			"openai:gpt-4":     true,
-			"openai:gpt-3.5":   true,
+			"openai:gpt-4":   true,
+			"openai:gpt-3.5": true,
 		},
 	}
 
@@ -103,7 +103,7 @@ func TestFallback_AllModelsUnavailableReturnsError(t *testing.T) {
 
 	health := &SelectiveHealthSource{
 		unhealthyModels: map[string]bool{
-			"openai:gpt-4":           true,
+			"openai:gpt-4":          true,
 			"anthropic:claude-opus": true,
 		},
 	}

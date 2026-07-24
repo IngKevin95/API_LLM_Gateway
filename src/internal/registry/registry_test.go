@@ -163,7 +163,8 @@ routing:
 
 // AC5 — Happy: parámetros de red físicos (max_in_flight, stream_idle_timeout) expuestos.
 func TestLoad_NetworkParams_Exposed(t *testing.T) {
-	t.Setenv("OPENAI_API_KEY", "sk-x"); t.Setenv("ANTHROPIC_API_KEY", "sk-y")
+	t.Setenv("OPENAI_API_KEY", "sk-x")
+	t.Setenv("ANTHROPIC_API_KEY", "sk-y")
 	reg, err := Load(writeConfig(t, validYAML), nil)
 	if err != nil {
 		t.Fatalf("Load error inesperado: %v", err)

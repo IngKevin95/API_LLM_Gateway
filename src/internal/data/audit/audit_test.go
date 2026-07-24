@@ -15,18 +15,18 @@ func TestAudit_SuccessfulRequest_EmitsAuditEvent(t *testing.T) {
 
 	// Dado: petición exitosa completada
 	rec := audit.AuditRecord{
-		RequestID:       "req-123",
-		TenantID:        "tenant-001",
-		AgentID:         "agent-001",
-		Capability:      "reasoning",
-		Provider:        "anthropic",
-		Model:           "claude-3-opus",
-		TokensPrompt:    100,
+		RequestID:        "req-123",
+		TenantID:         "tenant-001",
+		AgentID:          "agent-001",
+		Capability:       "reasoning",
+		Provider:         "anthropic",
+		Model:            "claude-3-opus",
+		TokensPrompt:     100,
 		TokensCompletion: 50,
-		Cost:            0.005,
-		LatencyMs:       245,
-		StatusCode:      200,
-		Timestamp:       time.Now().UTC(),
+		Cost:             0.005,
+		LatencyMs:        245,
+		StatusCode:       200,
+		Timestamp:        time.Now().UTC(),
 	}
 
 	// Cuando: se registra el evento
@@ -54,18 +54,18 @@ func TestAudit_FailoverRetry_MultipleEvents(t *testing.T) {
 	// Dado: dos intentos (fallido + exitoso)
 	events := []audit.AuditRecord{
 		{
-			RequestID:   "req-123",
-			TenantID:    "tenant-001",
-			Provider:    "openai",
-			StatusCode:  429,
-			Timestamp:   time.Now().UTC(),
+			RequestID:  "req-123",
+			TenantID:   "tenant-001",
+			Provider:   "openai",
+			StatusCode: 429,
+			Timestamp:  time.Now().UTC(),
 		},
 		{
-			RequestID:   "req-123",
-			TenantID:    "tenant-001",
-			Provider:    "anthropic",
-			StatusCode:  200,
-			Timestamp:   time.Now().UTC(),
+			RequestID:  "req-123",
+			TenantID:   "tenant-001",
+			Provider:   "anthropic",
+			StatusCode: 200,
+			Timestamp:  time.Now().UTC(),
 		},
 	}
 

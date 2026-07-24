@@ -57,7 +57,7 @@ type User struct {
 
 // Errores de dominio expuestos al handler HTTP para mapear a códigos.
 var (
-	ErrEmailExists  = errors.New("user: email ya registrado")
+	ErrEmailExists    = errors.New("user: email ya registrado")
 	ErrNotFound       = errors.New("user: no encontrado")
 	ErrInvalidInput   = errors.New("user: entrada inválida")
 	ErrInvalidMfaCode = errors.New("user: código mfa inválido")

@@ -41,8 +41,8 @@ func TestFormatDetector_DetectsResponsesAPIFormat(t *testing.T) {
 	detector := NewFormatDetector()
 
 	request := map[string]interface{}{
-		"input":             []interface{}{},
-		"reasoning_effort":  "medium",
+		"input":            []interface{}{},
+		"reasoning_effort": "medium",
 	}
 
 	format := detector.DetectFormat(request)

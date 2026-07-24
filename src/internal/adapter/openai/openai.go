@@ -40,9 +40,9 @@ func New(baseURL, apiKey string) *Adapter {
 // --- formato de cable OpenAI (subconjunto) ---
 
 type wireMessage struct {
-	Role      string             `json:"role"`
-	Content   string             `json:"content"`
-	ToolCalls []wireToolCall     `json:"tool_calls,omitempty"`
+	Role      string         `json:"role"`
+	Content   string         `json:"content"`
+	ToolCalls []wireToolCall `json:"tool_calls,omitempty"`
 }
 
 type wireToolCall struct {

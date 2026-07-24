@@ -56,7 +56,7 @@ func TestScoreAll_PenalizesLowRemainingQuota(t *testing.T) {
 func TestScoreAll_NoPenalization_AtExactThreshold(t *testing.T) {
 	models := penaltyTestModels()
 	r := New(stubSource{models: models}, allHealthy{}, perModelQuota{remaining: map[string]int{
-		"low-quota":  20,  // exactamente 20% de 100 -> NO penalizado (threshold = 20, 20 < 20 es falso)
+		"low-quota":  20, // exactamente 20% de 100 -> NO penalizado (threshold = 20, 20 < 20 es falso)
 		"high-quota": 100,
 	}}, tokenizer.NewHeuristic())
 

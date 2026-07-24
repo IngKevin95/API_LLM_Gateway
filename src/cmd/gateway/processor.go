@@ -20,12 +20,13 @@ type MetricsRecorder interface {
 // GatewayProcessor implements the Processor interface for API handlers.
 // It wraps the Failover Engine to complete requests through the Router -> Failover -> Adapters pipeline.
 // EP-011 Scope:
-//   HU-050: Logging OpenAI handler
-//   HU-051: Debug ProcessChat()
-//   HU-052: Validar Router.Route()
-//   HU-056: Normalizar IDs proveedores (config.yaml)
-//   HU-057: Implementar ProcessEmbedding()
-//   HU-058: Fix Anthropic /v1/messages
+//
+//	HU-050: Logging OpenAI handler
+//	HU-051: Debug ProcessChat()
+//	HU-052: Validar Router.Route()
+//	HU-056: Normalizar IDs proveedores (config.yaml)
+//	HU-057: Implementar ProcessEmbedding()
+//	HU-058: Fix Anthropic /v1/messages
 type GatewayProcessor struct {
 	failover     *failover.Engine
 	metricsStore MetricsRecorder

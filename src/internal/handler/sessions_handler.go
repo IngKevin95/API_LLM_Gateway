@@ -30,7 +30,7 @@ func (h *SessionsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		h.list(w, r, userID)
 	case http.MethodDelete:
-		h.revokeAll(w, r, userID)
+		h.revokeAll(w, r, userID, authIdentity)
 	default:
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 	}
@@ -44,24 +44,21 @@ func (h *SessionsHandler) list(w http.ResponseWriter, r *http.Request, userID st
 	}
 	// TODO: Marcar las expiradas como expired si hay lógica de TTL, o simplemente
 	// se filtran si el DB o el query lo hiciera. Por ahora devolvemos la lista.
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"data": sessions})
 }
 
-func (h *SessionsHandler) revokeAll(w http.ResponseWriter, r *http.Request, userID string) {
+func (h *SessionsHandler) revokeAll(w http.ResponseWriter, r *http.Request, userID string, authIdentity auth.Identity) {
 	exceptCurrent := r.URL.Query().Get("except_current") == "true"
 	if exceptCurrent {
-		// Asumimos que el auth package podría darnos el sessionID actual.
-		// En este scope usaremos una clave de contexto provisional.
-		type sessionKey struct{}
-		sessionID, _ := r.Context().Value(sessionKey{}).(string)
+		sessionID := authIdentity.SessionID
 		if sessionID != "" {
 			_ = h.sessions.RevokeOthers(r.Context(), userID, sessionID)
 		}
 	} else {
-		// Sin param except_current, la épica/AC no dice explícitamente "borrar todo", 
-		// pero si hicieran DELETE /sessions sin params, podríamos borrar todas. 
+		// Sin param except_current, la épica/AC no dice explícitamente "borrar todo",
+		// pero si hicieran DELETE /sessions sin params, podríamos borrar todas.
 		// (Revocamos todas las sesiones de user_id - requiere query si se quiere soportar)
 		// Por brevedad y para el AC3 "cerrar todas menos la actual", implementamos `RevokeOthers`.
 	}

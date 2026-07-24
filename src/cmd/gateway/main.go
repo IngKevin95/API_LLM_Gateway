@@ -16,16 +16,17 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	_ "github.com/lib/pq"
 
 	"api-llm-gateway/internal/adapter"
 	adapteraihubmix "api-llm-gateway/internal/adapter/aihubmix"
 	adapteranthropc "api-llm-gateway/internal/adapter/anthropic"
+	adaptergeneric "api-llm-gateway/internal/adapter/generic"
 	adaptergoogle "api-llm-gateway/internal/adapter/google"
 	adapterlocal "api-llm-gateway/internal/adapter/local"
 	adapteromniroute "api-llm-gateway/internal/adapter/omniroute"
 	adapteropenai "api-llm-gateway/internal/adapter/openai"
-	adaptergeneric "api-llm-gateway/internal/adapter/generic"
 	"api-llm-gateway/internal/alert"
 	apianthropic "api-llm-gateway/internal/api/anthropic"
 	apiopenai "api-llm-gateway/internal/api/openai"
@@ -245,19 +246,46 @@ func main() {
 		log.Printf("WARN gateway: GATEWAY_USERS_POSTGRES_DSN no configurado, /users deshabilitado")
 	}
 	registerUsersRoutes(mux, userStore, userKeys, os.Getenv("GATEWAY_ADMIN_TOKEN"))
-	registerAuthRoutes(mux, userStore, sessionStore, os.Getenv("GATEWAY_ADMIN_TOKEN"))
+	jwtSecret := []byte(os.Getenv("GATEWAY_JWT_SECRET"))
+	if len(jwtSecret) == 0 {
+		jwtSecret = []byte("default-dev-secret-do-not-use-in-prod")
+	}
+	registerAuthRoutes(mux, userStore, sessionStore, os.Getenv("GATEWAY_ADMIN_TOKEN"), jwtSecret)
 
 	// identityMiddleware (HU-EVO-018): intenta resolver la identidad primero
-	// contra userKeys (PostgreSQL, reemplazo declarado por la HU); si no hay
-	// userKeys configurado o la key no matchea ahí, cae a apiKeyStore (seed
-	// legacy GATEWAY_API_KEYS) para no romper despliegues que todavía no
-	// migraron. Ambas rutas terminan inyectando auth.Identity en el contexto
-	// vía apikey.Middleware o manualmente.
+	// contra JWT local (Fase 4), luego userKeys (PostgreSQL), finalmente apiKeyStore (legacy).
 	identityMiddleware := func(next http.Handler) http.Handler {
 		legacy := apikey.Middleware(apiKeyStore)(next)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if userKeys != nil {
-				if token := extractBearer(r); token != "" {
+			token := extractBearer(r)
+			if token != "" {
+				// JWT Local (HS256) check
+				claims := jwt.MapClaims{}
+				_, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (any, error) {
+					return jwtSecret, nil
+				}, jwt.WithValidMethods([]string{"HS256"}))
+
+				if err == nil {
+					sid, _ := claims["sid"].(string)
+					if sid != "" && sessionStore != nil {
+						if ok, _ := sessionStore.IsValid(r.Context(), sid); ok {
+							sub, _ := claims["sub"].(string)
+							tenant, _ := claims["tenant"].(string)
+							id := auth.Identity{Subject: sub, Tenant: tenant, SessionID: sid}
+							if rawScopes, ok := claims["scopes"].([]any); ok {
+								for _, s := range rawScopes {
+									if str, ok := s.(string); ok {
+										id.Scopes = append(id.Scopes, str)
+									}
+								}
+							}
+							next.ServeHTTP(w, r.WithContext(auth.WithIdentity(r.Context(), id)))
+							return
+						}
+					}
+				}
+
+				if userKeys != nil {
 					if id, ok := userKeys.Authenticate(r.Context(), token); ok {
 						next.ServeHTTP(w, r.WithContext(auth.WithIdentity(r.Context(), id)))
 						return
@@ -466,8 +494,8 @@ func registerUsersRoutes(mux *http.ServeMux, userStore *user.Store, userKeys *us
 	mux.HandleFunc("DELETE /users/{id}/api-keys/{keyId}", wrap(http.HandlerFunc(apiKeysHandler.RevokeAPIKey)))
 }
 
-// registerAuthRoutes cablea /sessions y /auth/mfa*
-func registerAuthRoutes(mux *http.ServeMux, userStore *user.Store, sessionStore *user.SessionStore, adminToken string) {
+// registerAuthRoutes cablea /sessions, /auth/login y /auth/mfa*
+func registerAuthRoutes(mux *http.ServeMux, userStore *user.Store, sessionStore *user.SessionStore, adminToken string, jwtSecret []byte) {
 	unavailable := func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, `{"error":"auth store not configured"}`, http.StatusServiceUnavailable)
 	}
@@ -482,8 +510,9 @@ func registerAuthRoutes(mux *http.ServeMux, userStore *user.Store, sessionStore 
 
 	sessionsHandler := handler.NewSessionsHandler(sessionStore)
 	mfaHandler := handler.NewMfaHandler(userStore)
+	authHandler := handler.NewAuthHandler(userStore, sessionStore, jwtSecret)
 
-	// Auth requires authenticated user (not just admin token). 
+	// Auth requires authenticated user (not just admin token).
 	// For simplicity in this wiring, we reuse resolveUserAuth or just assume identityMiddleware protects it.
 	// We'll wrap with resolveUserAuth which sets context, but it doesn't strictly block unauthenticated.
 	// Actually, identityMiddleware runs around the whole mux later. But the handler itself checks auth.FromContext!
@@ -494,6 +523,7 @@ func registerAuthRoutes(mux *http.ServeMux, userStore *user.Store, sessionStore 
 		}
 	}
 
+	mux.HandleFunc("POST /auth/login", authHandler.Login)
 	mux.HandleFunc("/sessions", wrap(sessionsHandler))
 	mux.HandleFunc("DELETE /sessions/{id}", wrap(http.HandlerFunc(sessionsHandler.RevokeSession)))
 	mux.HandleFunc("/auth/mfa/enroll", wrap(http.HandlerFunc(mfaHandler.Enroll)))

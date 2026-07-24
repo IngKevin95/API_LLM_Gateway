@@ -10,6 +10,7 @@ type Identity struct {
 	Tenant       string   // tenant al que pertenece
 	Scopes       []string // p.ej. "capability:coding", "capability:vision:trusted"
 	VettedModels []string // modelos explícitamente vetados para esta credencial
+	SessionID    string   // ID de sesión si la identidad proviene de un token de sesión
 }
 
 type ctxKey struct{}

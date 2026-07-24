@@ -103,6 +103,6 @@ func (e *Engine) Evaluate() error {
 
 	// Save prev before updating
 	// (In a real system, we'd query the current weights first)
-	
+
 	return e.updater.UpdateWeights(weights)
 }

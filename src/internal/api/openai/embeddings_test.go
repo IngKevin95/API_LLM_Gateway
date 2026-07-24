@@ -109,4 +109,3 @@ func TestOpenAI_Embeddings_LargeBatch_RejectsWithClearError(t *testing.T) {
 		t.Error("large batch should be rejected")
 	}
 }
-

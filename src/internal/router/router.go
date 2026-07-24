@@ -151,10 +151,10 @@ func (r *Router) scoreAll(models []registry.Model) map[string]float64 {
 	quMin, quMax := extent(models, func(m registry.Model) float64 { return float64(r.quota.Remaining(m.ProviderID, m.Name)) })
 
 	for _, m := range models {
-		qN := norm(float64(m.QualityScore), qMin, qMax)           // mayor calidad, mejor
-		latN := 1 - norm(float64(m.LatencyP50ms), lMin, lMax)     // menor latencia, mejor
-		speedN := latN                                            // velocidad ≈ inverso de latencia (hasta tener throughput real)
-		costN := 1 - norm(float64(m.CostPer1M), cMin, cMax)       // menor costo, mejor
+		qN := norm(float64(m.QualityScore), qMin, qMax)       // mayor calidad, mejor
+		latN := 1 - norm(float64(m.LatencyP50ms), lMin, lMax) // menor latencia, mejor
+		speedN := latN                                        // velocidad ≈ inverso de latencia (hasta tener throughput real)
+		costN := 1 - norm(float64(m.CostPer1M), cMin, cMax)   // menor costo, mejor
 		quotaN := norm(float64(r.quota.Remaining(m.ProviderID, m.Name)), quMin, quMax)
 		availN := 1.0 // candidatos ya pasaron el filtro de salud
 

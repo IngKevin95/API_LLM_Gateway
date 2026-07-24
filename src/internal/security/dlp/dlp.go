@@ -15,7 +15,7 @@ var (
 // SyncRedactor redacta PII síncrono (< 10ms) antes de enviar al modelo.
 // ponytail: regex duros (email/tarjeta/SSN). ML NLP diferido a EP-009.
 type SyncRedactor struct {
-	timeout time.Duration
+	timeout  time.Duration
 	patterns []*regexp.Regexp
 }
 

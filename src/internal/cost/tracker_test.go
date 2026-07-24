@@ -16,12 +16,12 @@ func (m *mockModelFinder) CostPer1M(modelName string) (int, bool) {
 
 func TestTracker_Track(t *testing.T) {
 	tests := []struct {
-		name          string
-		modelCost     int
-		exists        bool
-		prompt        int
-		completion    int
-		expectedCost  float64
+		name         string
+		modelCost    int
+		exists       bool
+		prompt       int
+		completion   int
+		expectedCost float64
 	}{
 		{
 			name:         "Cost 10 per 1M, 500k prompt, 500k completion",
