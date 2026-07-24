@@ -62,3 +62,34 @@ if err.StatusCode == 429 {
 - Integra: `src/internal/failover/failover.go` (HU-004a/c)
 - Usa: HU-EVO-006 (headers parseados con RetryAfter)
 - Coordina con: HU-EVO-004 (health monitor blacklist)
+
+## Estado real de implementación (actualizado tras re-verificación adversarial)
+
+Un cierre previo del slice EP-EVO-002 declaró estos AC como cumplidos sin evidencia real de
+ejecución. Tras reabrir el slice, el estado real por escenario es:
+
+- **AC1** (Retry-After en segundos): implementado y probado end-to-end.
+  `src/internal/adapter/generic/adapter.go:parseRetryAfter` → `failover.Engine.Complete` →
+  `health.RetireOn429`. Test: `integration/retry_after_test.go`,
+  `internal/health/retire429_test.go`.
+- **AC2** (Retry-After en fecha HTTP): implementado en esta corrección.
+  `generic.parseRetryAfter` ahora intenta `time.Parse(time.RFC1123, ...)` cuando el header no es
+  un entero de segundos. Test: `internal/adapter/generic/wiring_fix_test.go`.
+- **AC3** (sin Retry-After → default 30s): implementado y probado.
+  `internal/health/retire429_test.go:TestRetireOn429_NoRetryAfter_DefaultsTo30s`.
+- **AC4** (429 mid-stream): implementado en esta corrección, a nivel de
+  `generic.sseStream` (`src/internal/adapter/generic/stream.go`): detecta un evento de error
+  rate-limit en el body SSE y aborta sin failover transparente. Test:
+  `internal/adapter/generic/wiring_fix_test.go`.
+  **Nota de alcance**: `cmd/gateway/processor.go:ProcessChatStream` sigue devolviendo `501` — el
+  streaming end-to-end del gateway no está implementado (gap pre-existente del MVP, no de esta
+  historia). El fix cierra el AC al nivel de Adapter/TokenStream, que es donde esta historia lo
+  declara.
+- **AC5** (backoff exponencial 30→60→120→240s): implementado con **discrepancia menor** respecto
+  a este AC — la implementación real (`internal/health/retire429_test.go`,
+  `TestRetireOn429_ExponentialBackoff`) topa en **120s**, no en 240s como dice la tabla de arriba.
+  No bloqueante; deuda de spec/impl a conciliar en una revisión futura si se decide ajustar.
+
+**Diferido, no implementado**: la persistencia a PostgreSQL de la cuota aprendida (ver
+HU-EVO-008) sigue usando `NoPersister` (no-op) en producción. No es parte de los AC de esta
+historia, pero afecta la durabilidad del aprendizaje entre reinicios del gateway.
