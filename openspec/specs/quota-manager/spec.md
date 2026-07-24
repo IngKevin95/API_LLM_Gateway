@@ -1,30 +1,28 @@
-# Quota Manager Specification
+## ADDED Requirements
 
-## 1. Responsibilities
-El Quota Manager es responsable de contabilizar y autorizar el consumo de tokens y peticiones para cada proveedor. Protege las credenciales de incurrir en sobrecostos o de superar sus cuotas asignadas (diarias, mensuales, etc.).
+### Requirement: Inicialización de cuota desde quota_hint del YAML
+El Quota Manager SHALL inicializar `remaining` por proveedor desde el campo `quota_hint` de
+`free-tier.yaml` en boot, tratando valores `<= 0` como cuota agotada y usando un default de 1M
+tokens cuando el campo está ausente. El valor aprendido en runtime (desde headers de
+rate-limit) o restaurado desde persistencia SHALL tener precedencia sobre el `quota_hint` inicial.
+(Traza: HU-EVO-005)
 
-## 2. Interface
-```go
-package quota
+#### Scenario: Init remaining desde quota_hint YAML
+- **WHEN** Groq en `free-tier.yaml` tiene `quota_hint: 14400` y Quota Manager arranca
+- **THEN** `Remaining("groq")` devuelve 14400 sin haber realizado ninguna request
 
-type Consumption struct {
-    Tokens   int
-    Requests int
-}
+#### Scenario: Header learned sobrescribe quota_hint
+- **WHEN** el primer request a Groq devuelve header `X-RateLimit-Remaining: 14300`
+- **THEN** Quota Manager aprende ese valor y actualiza `remaining` a 14300, con precedencia sobre el `quota_hint` inicial
 
-type Manager interface {
-    // Reserve verifica de forma atómica si hay cuota disponible. 
-    // Retorna false si excede la cuota para la ventana temporal actual.
-    Reserve(providerID string, estimate Consumption) bool
-    
-    // Commit confirma el consumo real post-ejecución y ajusta saldos.
-    Commit(providerID string, actual Consumption) error
-}
-```
+#### Scenario: quota_hint <= 0 tratado como agotado
+- **WHEN** un proveedor tiene `quota_hint: 0` (o negativo) en `free-tier.yaml`
+- **THEN** Quota Manager lo carga como agotado (`remaining = 0`) y el Router lo excluye hasta el primer aprendizaje real
 
-## 3. Comportamientos y Reglas
-1. **Validación Atómica (RAM)**: Para no degradar la latencia (<50ms), las autorizaciones se realizan en memoria local.
-2. **Ventana Temporal**: Los límites operan por ventanas de tiempo (ej. diario, mensual). Al expirar la ventana, la cuota se reinicia (0 consumido).
-3. **Reserva (Reserve)**: Anticipa el gasto (con un estimado de tokens de entrada+salida). Si falla, la request es rechazada/ruteada a otro proveedor (HU-006 AC2 y AC4).
-4. **Descuento final (Commit)**: Registra el conteo real tras completarse el stream o la respuesta síncrona. Si el real excede el estimado, la cuota de la siguiente ventana puede arrastrar déficit o bloquear futuras requests (HU-006 AC5).
-5. **Persistencia**: La memoria sincroniza asincrónicamente mediante el WAL persistente (EP-009) para no perder el estado de cuota tras reinicios.
+#### Scenario: Proveedor sin quota_hint usa default
+- **WHEN** un proveedor nuevo no tiene `quota_hint` definido en el YAML
+- **THEN** Quota Manager asume un default de 1M tokens como `remaining` inicial
+
+#### Scenario: Reinicio restaura learned quota desde PostgreSQL
+- **WHEN** antes de un reinicio se aprendió que un proveedor tiene 500M `remaining`, y el Gateway reinicia
+- **THEN** Quota Manager lee PostgreSQL y restaura 500M como `remaining`, sin volver al `quota_hint` original del YAML

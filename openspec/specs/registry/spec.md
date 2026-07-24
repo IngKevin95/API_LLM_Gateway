@@ -1,40 +1,27 @@
-# registry Specification
+## ADDED Requirements
 
-## Purpose
-TBD - created by archiving change enrutamiento-por-capacidad. Update Purpose after archive.
-## Requirements
-### Requirement: Carga declarativa del catálogo desde YAML
-El Registry SHALL cargar `config.yaml` (providers, models con atributos de score, y routing por capacidad) a memoria RAM durante el arranque y exponer los modelos habilitados por capacidad. (Traza: HU-001 AC1)
+### Requirement: Carga del catálogo free-tier.yaml
+El Registry SHALL cargar `config/providers/free-tier.yaml` con los proveedores gratuitos
+priorizados (Groq, Cerebras, Mistral, Gemini, Cloudflare AI), registrando cada uno con su spec
+completo y dejándolo disponible para el routing. Los proveedores declarados en `free-tier.yaml`
+SHALL tener precedencia sobre entradas del mismo proveedor en `config.yaml`. (Traza: HU-EVO-002)
 
-#### Scenario: Carga válida
-- **WHEN** la Gateway inicia con un `config.yaml` que declara providers, models (quality/coding/reasoning/speed/vision/cost/latency) y routing por capacidad
-- **THEN** el catálogo queda en memoria, los modelos habilitados quedan expuestos por capacidad y el conteo final se imprime en stdout
+#### Scenario: Registry.Load carga free-tier.yaml
+- **WHEN** `Registry.Load()` se ejecuta en boot y existe `config/providers/free-tier.yaml` con 5 proveedores
+- **THEN** deserializa cada proveedor, lo registra con su spec completo, y queda disponible para routing
 
-### Requirement: Fail-fast ante YAML inválido
-El Registry SHALL abortar el arranque cuando el `config.yaml` tenga sintaxis inválida o falte un campo obligatorio, sin dejar el sistema en estado parcial. (Traza: HU-001 AC2)
+#### Scenario: free-tier.yaml sobrescribe config.yaml
+- **WHEN** un proveedor (p. ej. Groq) está declarado tanto en `config.yaml` como en `free-tier.yaml`
+- **THEN** la versión de `free-tier.yaml` (con `quota_hint` más realista) es la que queda activa tras la carga
 
-#### Scenario: YAML inválido o campo faltante
-- **WHEN** la Gateway inicia con un `config.yaml` sintácticamente inválido o con un campo obligatorio ausente
-- **THEN** el arranque falla con un error que nombra archivo, línea y campo problemático, y el sistema no arranca en estado parcial
+#### Scenario: YAML malformado aborta el arranque
+- **WHEN** `free-tier.yaml` tiene sintaxis inválida (p. ej. JSON en lugar de YAML)
+- **THEN** `Registry.Load()` retorna `ErrInvalidConfig` y el Gateway no inicia (fail-fast)
 
-### Requirement: Prohibición de secretos literales
-El Registry SHALL rechazar valores de secreto literales (p. ej. `api_key`) y exigir referencia por `${VAR}` resuelta desde el entorno, sin imprimir nunca el valor. (Traza: HU-001 AC3)
+#### Scenario: Proveedor sin modelo default excluido del scoring
+- **WHEN** un proveedor en `free-tier.yaml` tiene `models: []` vacío
+- **THEN** el Router lo excluye automáticamente del scoring de esa capacidad sin crashear
 
-#### Scenario: API key literal embebida
-- **WHEN** el `config.yaml` declara una API key literal en vez de `${VAR}`
-- **THEN** el Registry rechaza la carga (o la clave), exige la referencia a variable de entorno y registra la violación sin imprimir el valor
-
-### Requirement: Capacidad sin modelos no aborta la carga
-El Registry SHALL marcar como no disponible cualquier capacidad de routing sin modelos habilitados, emitiendo un WARN, sin abortar el resto de la carga. (Traza: HU-001 AC4)
-
-#### Scenario: Capacidad vacía
-- **WHEN** una capacidad en `routing` no lista ningún modelo habilitado
-- **THEN** el Registry marca esa capacidad como no disponible, escribe un log WARN y continúa cargando el resto del catálogo
-
-### Requirement: Exposición de parámetros de red físicos
-El Registry SHALL exponer `max_in_flight` y `stream_idle_timeout` de cada provider al resto del Gateway (Failover Engine y Adapters). (Traza: HU-001 AC5)
-
-#### Scenario: Parámetros de red presentes
-- **WHEN** el `config.yaml` declara `max_in_flight` y `stream_idle_timeout`
-- **THEN** el Registry los expone a los consumidores (Failover Engine y Adapters)
-
+#### Scenario: quota_hint negativo tratado como agotado
+- **WHEN** un proveedor en `free-tier.yaml` tiene `quota_hint: -100`
+- **THEN** el Quota Manager lo trata como cuota agotada (`remaining = 0`) y el Router lo retira de la selección
