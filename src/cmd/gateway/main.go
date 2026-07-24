@@ -217,6 +217,7 @@ func main() {
 	// (503) en vez de tumbar el boot.
 	var userStore *user.Store
 	var userKeys *user.KeyStore
+	var sessionStore *user.SessionStore
 	usersDSN := os.Getenv("GATEWAY_USERS_POSTGRES_DSN")
 	if usersDSN == "" {
 		usersDSN = os.Getenv("GATEWAY_QUOTA_POSTGRES_DSN")
@@ -233,14 +234,18 @@ func main() {
 		} else if ks, err := user.NewKeyStore(udb, us); err != nil {
 			log.Printf("WARN gateway: api_keys store migración falló: %v", err)
 			_ = udb.Close()
+		} else if ss, err := user.NewSessionStore(udb, us); err != nil {
+			log.Printf("WARN gateway: sessions store migración falló: %v", err)
+			_ = udb.Close()
 		} else {
-			userStore, userKeys = us, ks
-			log.Printf("INFO gateway: users/api_keys store conectado a PostgreSQL")
+			userStore, userKeys, sessionStore = us, ks, ss
+			log.Printf("INFO gateway: users/api_keys/sessions store conectado a PostgreSQL")
 		}
 	} else {
 		log.Printf("WARN gateway: GATEWAY_USERS_POSTGRES_DSN no configurado, /users deshabilitado")
 	}
 	registerUsersRoutes(mux, userStore, userKeys, os.Getenv("GATEWAY_ADMIN_TOKEN"))
+	registerAuthRoutes(mux, userStore, sessionStore, os.Getenv("GATEWAY_ADMIN_TOKEN"))
 
 	// identityMiddleware (HU-EVO-018): intenta resolver la identidad primero
 	// contra userKeys (PostgreSQL, reemplazo declarado por la HU); si no hay
@@ -459,6 +464,41 @@ func registerUsersRoutes(mux *http.ServeMux, userStore *user.Store, userKeys *us
 	mux.HandleFunc("PATCH /users/{id}", wrap(http.HandlerFunc(usersHandler.PatchUser)))
 	mux.HandleFunc("/users/{id}/api-keys", wrap(apiKeysHandler))
 	mux.HandleFunc("DELETE /users/{id}/api-keys/{keyId}", wrap(http.HandlerFunc(apiKeysHandler.RevokeAPIKey)))
+}
+
+// registerAuthRoutes cablea /sessions y /auth/mfa*
+func registerAuthRoutes(mux *http.ServeMux, userStore *user.Store, sessionStore *user.SessionStore, adminToken string) {
+	unavailable := func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, `{"error":"auth store not configured"}`, http.StatusServiceUnavailable)
+	}
+	if userStore == nil || sessionStore == nil {
+		mux.HandleFunc("/sessions", unavailable)
+		mux.HandleFunc("DELETE /sessions/{id}", unavailable)
+		mux.HandleFunc("/auth/mfa/enroll", unavailable)
+		mux.HandleFunc("/auth/mfa/verify", unavailable)
+		mux.HandleFunc("/auth/mfa/disable", unavailable)
+		return
+	}
+
+	sessionsHandler := handler.NewSessionsHandler(sessionStore)
+	mfaHandler := handler.NewMfaHandler(userStore)
+
+	// Auth requires authenticated user (not just admin token). 
+	// For simplicity in this wiring, we reuse resolveUserAuth or just assume identityMiddleware protects it.
+	// We'll wrap with resolveUserAuth which sets context, but it doesn't strictly block unauthenticated.
+	// Actually, identityMiddleware runs around the whole mux later. But the handler itself checks auth.FromContext!
+	wrap := func(h http.Handler) http.HandlerFunc {
+		// Just a dummy wrapper that relies on the global identityMiddleware
+		return func(w http.ResponseWriter, r *http.Request) {
+			h.ServeHTTP(w, r)
+		}
+	}
+
+	mux.HandleFunc("/sessions", wrap(sessionsHandler))
+	mux.HandleFunc("DELETE /sessions/{id}", wrap(http.HandlerFunc(sessionsHandler.RevokeSession)))
+	mux.HandleFunc("/auth/mfa/enroll", wrap(http.HandlerFunc(mfaHandler.Enroll)))
+	mux.HandleFunc("/auth/mfa/verify", wrap(http.HandlerFunc(mfaHandler.Verify)))
+	mux.HandleFunc("/auth/mfa/disable", wrap(http.HandlerFunc(mfaHandler.Disable)))
 }
 
 // resolveUserAuth resuelve AdminContext + auth.Identity para el dominio de
