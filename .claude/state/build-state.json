@@ -27,11 +27,11 @@
       "HU-EVO-022"
     ],
     "layer": "business",
-    "openspec_change": null,
+    "openspec_change": "sesiones-2fa-totp",
     "branch": "feature/ep-evo-004-ss2-sesiones-2fa",
-    "phase": "dor",
+    "phase": "tdd",
     "gates": {
-      "dor": false,
+      "dor": true,
       "tdd": false,
       "journey_smoke": false,
       "coherence_link": false,
@@ -114,9 +114,14 @@
         "at": "2026-07-24T21:06:33Z",
         "by": "build-orchestrator",
         "note": "PR #48 de SS1 mergeado a develop. Se desbloquea SS2 (HU-EVO-019/020). active_slice reseteado para SS2 (phase dor, gates a false, checklist vacio). Siguiente paso: crear rama feature/ep-evo-004-ss2-sesiones-2fa y correr DoR."
+      },
+      {
+        "at": "2026-07-24T21:16:07Z",
+        "by": "build-orchestrator",
+        "note": "Artefactos openspec generados para sesiones-2fa-totp. Fase DoR y Change listas. Avanzando a TDD."
       }
     ],
-    "updated_at": "2026-07-24T21:06:33Z",
+    "updated_at": "2026-07-24T21:16:07Z",
     "updated_by": "build-orchestrator"
   },
   "history": [
