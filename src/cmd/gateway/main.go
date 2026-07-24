@@ -20,15 +20,22 @@ import (
 	adapterlocal "api-llm-gateway/internal/adapter/local"
 	adapteromniroute "api-llm-gateway/internal/adapter/omniroute"
 	adapteropenai "api-llm-gateway/internal/adapter/openai"
+	adaptergeneric "api-llm-gateway/internal/adapter/generic"
 	apianthropic "api-llm-gateway/internal/api/anthropic"
 	apiopenai "api-llm-gateway/internal/api/openai"
 	"api-llm-gateway/internal/failover"
+	"api-llm-gateway/internal/health"
 	"api-llm-gateway/internal/metrics"
 	"api-llm-gateway/internal/middleware"
+	"api-llm-gateway/internal/quota"
 	"api-llm-gateway/internal/registry"
 	"api-llm-gateway/internal/router"
 	"api-llm-gateway/internal/tokenizer"
 )
+
+// freeTierConfigPath es la ruta por defecto del catálogo de proveedores
+// gratuitos curados (HU-EVO-002); override vía GATEWAY_FREETIER_CONFIG.
+const freeTierConfigPath = "config/providers/free-tier.yaml"
 
 func main() {
 	port := os.Getenv("GATEWAY_PORT")
@@ -56,17 +63,57 @@ func main() {
 			log.Fatalf("registry: %v", err) // fail-fast, no arranca en estado parcial
 		}
 
-		// Build Router (EP-001)
-		rt := router.New(reg, router.StaticHealth{}, router.StaticQuota{}, tokenizer.NewHeuristic())
+		// HU-EVO-002: merge del catálogo de proveedores gratuitos curados sobre
+		// el catálogo base. Override de ruta vía GATEWAY_FREETIER_CONFIG; si no
+		// existe el archivo (ni el default ni el override explícito) se sigue
+		// sin free-tier, salvo que el override haya sido declarado explícito
+		// (en ese caso, fail-fast).
+		freeTierPath := os.Getenv("GATEWAY_FREETIER_CONFIG")
+		explicitFreeTier := freeTierPath != ""
+		if freeTierPath == "" {
+			freeTierPath = freeTierConfigPath
+		}
+		if _, statErr := os.Stat(freeTierPath); statErr == nil {
+			if err := reg.MergeFreeTier(freeTierPath, nil); err != nil {
+				log.Fatalf("registry: merge free-tier %s: %v", freeTierPath, err)
+			}
+			log.Printf("INFO gateway: free-tier catalog cargado desde %s", freeTierPath)
+		} else if explicitFreeTier {
+			log.Fatalf("registry: GATEWAY_FREETIER_CONFIG=%s no encontrado: %v", freeTierPath, statErr)
+		}
 
-		// Build Adapters (EP-002, EP-008)
+		// HU-EVO-005: Quota Manager inicializado desde los quota_hint del Registry
+		// (incluye los proveedores free-tier recién mergeados).
+		qm := quota.NewInMemoryManager()
+		qm.InitFromRegistry(reg.QuotaHints())
+
+		// HU-EVO-004: Health Monitor real; RetireOn429 lo invoca el Failover al
+		// recibir un 429 de un adapter (retiro temporal con backoff/Retry-After).
+		providerIDs := make([]string, 0, len(reg.Providers()))
+		for _, p := range reg.Providers() {
+			providerIDs = append(providerIDs, p.ID)
+		}
+		hm := health.New(providerIDs, func(string) bool { return true }, 3, 2)
+
+		// Build Router (EP-001) con Health/Quota reales en vez de los stubs estáticos.
+		rt := router.New(reg, hm, qm, tokenizer.NewHeuristic())
+
+		// Build Adapters (EP-002, EP-008, EP-EVO-001)
 		adapters := buildAdapters(reg)
 
-		// Build Failover Engine (EP-002)
+		// Build Failover Engine (EP-002); RetireOn429 se conecta al recibir 429s.
 		fe := failover.New(rt, adapters)
+		fe.OnRateLimited = hm.RetireOn429
 
 		// Create Processor that uses Failover and metrics
 		processor = NewGatewayProcessor(fe, metricsStore)
+
+		// Snapshot inicial de quota/proveedores para /metrics, visible sin tráfico previo.
+		quotaSnapshot := make(map[string]int, len(providerIDs))
+		for _, id := range providerIDs {
+			quotaSnapshot[id] = qm.Remaining(id, "")
+		}
+		metricsStore.SetProviderSnapshot(providerIDs, quotaSnapshot)
 	} else {
 		log.Printf("WARN gateway: sin config.yaml, arrancando en modo scaffold (solo /health)")
 	}
@@ -192,6 +239,29 @@ func buildAdapters(reg *registry.Registry) map[string]adapter.Adapter {
 		BaseURL: "http://omniroute:20128/v1",
 		APIKey:  "",
 	})
+
+	// HU-EVO-001: adapters data-driven para providers declarados type:generic
+	// (catálogo free-tier: Groq, Cerebras, Mistral, Gemini, Cloudflare AI, etc.).
+	// Todos hablan wire OpenAI-compatible salvo que se declare lo contrario.
+	for _, p := range reg.Providers() {
+		if p.Type != "generic" {
+			continue
+		}
+		if p.APIKey == "" {
+			log.Printf("WARN gateway: provider generic %q sin api_key resuelta, omitiendo adapter", p.ID)
+			continue
+		}
+		spec := adaptergeneric.ProviderSpec{
+			BaseURL: p.BaseURL,
+			Format:  adaptergeneric.FormatOpenAI,
+		}
+		ad, err := adaptergeneric.New(spec, p.APIKey)
+		if err != nil {
+			log.Printf("WARN gateway: provider generic %q spec inválido, omitiendo adapter: %v", p.ID, err)
+			continue
+		}
+		adapters[p.ID] = ad
+	}
 
 	return adapters
 }
