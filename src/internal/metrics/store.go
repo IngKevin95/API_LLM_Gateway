@@ -26,21 +26,50 @@ type InMemoryStore struct {
 	startIdx  int
 	startTime time.Time
 
-	// configuredProviders + quotaSnapshot (HU-EVO-005/EP-EVO-001): seteados en
-	// boot desde el Registry/Quota Manager, para que /metrics reporte
-	// proveedores y cuota aun sin tráfico previo (AC de journey_smoke).
+	// configuredProviders (HU-EVO-005/EP-EVO-001): seteado en boot desde el
+	// Registry, para que /metrics reporte proveedores aun sin tráfico previo
+	// (AC de journey_smoke).
 	configuredProviders []string
-	quotaSnapshot       map[string]int
+
+	// quotaSource (HU-EVO-011): Quota Manager real, consultado en vivo (sin
+	// cache) en cada GetGatewayMetrics/GetMetrics vía Snapshot() -- lectura
+	// pura en RAM, <100ms incluso con cientos de entradas (AC4).
+	quotaSource QuotaSource
 }
 
-// SetProviderSnapshot registra en boot los proveedores configurados y su cuota
-// remanente inicial (desde Quota Manager.InitFromRegistry), para que
+// QuotaSource es el subconjunto de quota.Manager que metrics.Store necesita
+// (evita el acoplamiento directo al paquete quota; lo satisface
+// *quota.inMemoryManager sin cambios).
+type QuotaSource interface {
+	Snapshot() []QuotaEntry
+}
+
+// QuotaEntry espeja quota.Snapshot (evita import cycle; quota no depende de
+// metrics). main.go adapta quota.Manager.Snapshot() a este tipo.
+type QuotaEntry struct {
+	Provider  string
+	Model     string
+	Limit     int64
+	Remaining int64
+	ResetAt   *time.Time
+	Healthy   bool
+	LearnedAt *time.Time
+}
+
+// SetProviderSnapshot registra en boot los proveedores configurados, para que
 // GetGatewayMetrics los reporte incluso antes de la primera request.
-func (s *InMemoryStore) SetProviderSnapshot(providerIDs []string, quota map[string]int) {
+func (s *InMemoryStore) SetProviderSnapshot(providerIDs []string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.configuredProviders = append([]string(nil), providerIDs...)
-	s.quotaSnapshot = quota
+}
+
+// SetQuotaSource inyecta el Quota Manager real (HU-EVO-011); sin esto, el
+// bloque Quota de /metrics queda vacío.
+func (s *InMemoryStore) SetQuotaSource(qs QuotaSource) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.quotaSource = qs
 }
 
 // NewInMemoryStore crea un store con tamaño máximo (últimas N métricas).
@@ -235,14 +264,25 @@ func (s *InMemoryStore) snapshotProviderStatusLocked() []ProviderStatus {
 	return out
 }
 
-// snapshotQuotaLocked copia el snapshot de cuota; el llamador debe sostener s.mu.
-func (s *InMemoryStore) snapshotQuotaLocked() map[string]int {
-	if s.quotaSnapshot == nil {
+// snapshotQuotaLocked lee en vivo el Quota Manager (si hay uno inyectado) y
+// lo proyecta a []QuotaSnapshot; el llamador debe sostener s.mu (source es
+// thread-safe por sí mismo, así que basta RLock de s.mu para leer el campo).
+func (s *InMemoryStore) snapshotQuotaLocked() []QuotaSnapshot {
+	if s.quotaSource == nil {
 		return nil
 	}
-	out := make(map[string]int, len(s.quotaSnapshot))
-	for k, v := range s.quotaSnapshot {
-		out[k] = v
+	entries := s.quotaSource.Snapshot()
+	out := make([]QuotaSnapshot, 0, len(entries))
+	for _, e := range entries {
+		out = append(out, QuotaSnapshot{
+			Provider:  e.Provider,
+			Model:     e.Model,
+			Limit:     e.Limit,
+			Remaining: e.Remaining,
+			ResetAt:   e.ResetAt,
+			Healthy:   e.Healthy,
+			LearnedAt: e.LearnedAt,
+		})
 	}
 	return out
 }
