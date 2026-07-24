@@ -1,6 +1,6 @@
 function healthBadge(healthy) {
   return (
-    <span className={`badge ${healthy ? 'badge-green' : 'badge-red'}`}>
+    <span className={`badge badge-status ${healthy ? 'badge-green' : 'badge-red'}`}>
       {healthy ? 'healthy' : 'unhealthy'}
     </span>
   );
@@ -21,9 +21,35 @@ function remainingBar(remaining, limit) {
 
 export default function Quotas({ metrics }) {
   const quota = metrics?.quota || [];
+  const providers = metrics?.providers || [];
+
+  const activeProviders = providers.filter((p) => p.available).length;
+  const avgLatency = metrics?.latency?.p50_ms ?? 0;
+  // "Cost Burn" del mockup se omite: el backend no expone datos de costo,
+  // no se inventa una cifra en dinero.
 
   return (
     <section data-testid="quotas-tab" aria-label="Quotas">
+      <div className="page-heading">
+        <h2>Resource Quota Management</h2>
+        <p className="page-subtitle">Real-time monitoring of provider limits and consumption across active gateways</p>
+      </div>
+
+      <div className="stat-grid stat-grid-compact">
+        <div className="stat-card">
+          <span className="stat-label">Active Providers</span>
+          <span className="stat-value mono">{activeProviders}</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-label">Avg Latency (p50)</span>
+          <span className="stat-value mono">{avgLatency}ms</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-label">Tracked Quotas</span>
+          <span className="stat-value mono">{quota.length}</span>
+        </div>
+      </div>
+
       <table className="mono-table" aria-label="Tabla de cuotas por proveedor y modelo">
         <thead>
           <tr>

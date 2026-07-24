@@ -20,14 +20,37 @@ export default function Dashboard() {
   return (
     <div className="gateway-ops-dark" data-testid="dashboard-root">
       <header className="dashboard-header">
-        <h1>API LLM Gateway — Dashboard</h1>
+        <div className="header-brand">
+          <span className="header-logo" aria-hidden="true">◆</span>
+          <h1>API LLM Gateway</h1>
+        </div>
         <div className="header-actions">
+          <span className="tenant-pill" data-testid="tenant-pill" title="RBAC de tenant real fuera de alcance de este payload">
+            Tenant: Production
+          </span>
           <span className="refresh-indicator" data-testid="refresh-indicator" title="Los datos se refrescan automaticamente cada 5s">
             <span className="refresh-dot" aria-hidden="true" />
             auto-refresh: 5s
           </span>
-          <button type="button" onClick={() => setSettingsOpen(true)} data-testid="open-settings">
-            Settings
+          <button
+            type="button"
+            className="icon-button"
+            onClick={() => window.location.reload()}
+            data-testid="manual-refresh"
+            title="Refrescar manualmente"
+            aria-label="Refrescar manualmente"
+          >
+            ⟳
+          </button>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={() => setSettingsOpen(true)}
+            data-testid="open-settings"
+            title="Ajustes"
+            aria-label="Ajustes"
+          >
+            ⚙
           </button>
         </div>
       </header>
