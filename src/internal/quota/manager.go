@@ -1,6 +1,7 @@
 package quota
 
 import (
+	"sort"
 	"sync"
 	"time"
 
@@ -17,6 +18,21 @@ type Manager interface {
 	Commit(providerID string, estimate Consumption, actual Consumption) error
 	Remaining(providerID, model string) int
 	LearnFromHeaders(providerID, modelID string, quota adapter.QuotaInfo)
+	Snapshot() []Snapshot
+}
+
+// Snapshot describe la cuota remanente de un proveedor/modelo en un instante
+// dado (lectura pura desde el mapa en RAM, sin I/O). La consumen
+// metrics.Store (HU-EVO-011, expuesto en /metrics) y alert.Manager
+// (HU-EVO-012, evaluado contra el umbral configurable).
+type Snapshot struct {
+	Provider  string
+	Model     string // "" cuando el proveedor no tiene desglose por modelo aún (solo quota_hint)
+	Limit     int64
+	Remaining int64
+	ResetAt   *time.Time
+	Healthy   bool       // false cuando Remaining == 0
+	LearnedAt *time.Time // nil si nunca aprendió de headers de respuesta (usa quota_hint inicial)
 }
 
 type providerState struct {
@@ -27,9 +43,20 @@ type providerState struct {
 	learnedRemaining *int64 // nil = calculate from limit-used; otherwise use this value
 }
 
+// modelState guarda el desglose de cuota aprendida por modelo individual
+// (HU-EVO-011 AC2/AC5: un proveedor con varios modelos expone remaining
+// independiente por cada uno, poblado al aprender headers reales).
+type modelState struct {
+	limit     int64
+	remaining int64
+	resetAt   *time.Time
+	learnedAt *time.Time
+}
+
 type inMemoryManager struct {
 	mu        sync.RWMutex
 	states    map[string]*providerState
+	perModel  map[string]map[string]*modelState // providerID -> modelID -> state
 	clock     func() time.Time
 	persister Persister // optional async persistence (HU-EVO-008)
 }
@@ -41,6 +68,7 @@ func NewInMemoryManager() *inMemoryManager {
 func NewInMemoryManagerWithClock(clock func() time.Time) *inMemoryManager {
 	return &inMemoryManager{
 		states:    make(map[string]*providerState),
+		perModel:  make(map[string]map[string]*modelState),
 		clock:     clock,
 		persister: &NoPersister{}, // default: no persistence
 	}
@@ -49,6 +77,7 @@ func NewInMemoryManagerWithClock(clock func() time.Time) *inMemoryManager {
 func NewInMemoryManagerWithPersister(clock func() time.Time, persister Persister) *inMemoryManager {
 	return &inMemoryManager{
 		states:    make(map[string]*providerState),
+		perModel:  make(map[string]map[string]*modelState),
 		clock:     clock,
 		persister: persister,
 	}
@@ -226,6 +255,29 @@ func (m *inMemoryManager) LearnFromHeaders(providerID, modelID string, quota ada
 	state.learnedRemaining = &remaining
 	state.resetAt = quota.ResetAt
 
+	// HU-EVO-011 AC2: desglose por modelo individual, además del agregado por
+	// proveedor. modelID vacío no genera entrada de modelo (se sigue exponiendo
+	// solo el agregado del proveedor en Snapshot()).
+	if modelID != "" {
+		if m.perModel == nil {
+			m.perModel = make(map[string]map[string]*modelState)
+		}
+		if m.perModel[providerID] == nil {
+			m.perModel[providerID] = make(map[string]*modelState)
+		}
+		limit := state.limit.Tokens
+		if quota.Limit > 0 {
+			limit = int(quota.Limit)
+		}
+		now := m.clock()
+		m.perModel[providerID][modelID] = &modelState{
+			limit:     int64(limit),
+			remaining: remaining,
+			resetAt:   quota.ResetAt,
+			learnedAt: &now,
+		}
+	}
+
 	// Enqueue async persistence (HU-EVO-008)
 	if m.persister != nil {
 		go func() {
@@ -236,6 +288,76 @@ func (m *inMemoryManager) LearnFromHeaders(providerID, modelID string, quota ada
 			})
 		}()
 	}
+}
+
+// Snapshot devuelve el estado de cuota actual de todos los proveedores
+// conocidos (HU-EVO-011). Lectura pura desde el mapa en RAM (sin I/O), por
+// eso puede llamarse en cada request de /metrics sin impacto de latencia
+// (AC4: <100ms con 125 cuotas). Cuando un proveedor tiene desglose por
+// modelo (aprendido de headers reales, AC2), se listan sus modelos
+// individuales; si no, se expone un único registro agregado con
+// model:"" y remaining/limit del quota_hint inicial (AC3), con
+// LearnedAt:nil.
+func (m *inMemoryManager) Snapshot() []Snapshot {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	out := make([]Snapshot, 0, len(m.states))
+	for providerID, st := range m.states {
+		models := m.perModel[providerID]
+		if len(models) == 0 {
+			remaining := m.remainingLocked(st)
+			out = append(out, Snapshot{
+				Provider:  providerID,
+				Model:     "",
+				Limit:     int64(st.limit.Tokens),
+				Remaining: int64(remaining),
+				ResetAt:   st.resetAt,
+				Healthy:   remaining > 0,
+				LearnedAt: nil,
+			})
+			continue
+		}
+		for modelID, ms := range models {
+			out = append(out, Snapshot{
+				Provider:  providerID,
+				Model:     modelID,
+				Limit:     ms.limit,
+				Remaining: ms.remaining,
+				ResetAt:   ms.resetAt,
+				Healthy:   ms.remaining > 0,
+				LearnedAt: ms.learnedAt,
+			})
+		}
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Provider != out[j].Provider {
+			return out[i].Provider < out[j].Provider
+		}
+		return out[i].Model < out[j].Model
+	})
+	return out
+}
+
+// remainingLocked replica la lógica de Remaining() sin re-adquirir el lock
+// (el llamador ya sostiene m.mu). Evita el deadlock de RLock reentrante.
+func (m *inMemoryManager) remainingLocked(state *providerState) int {
+	if state.learnedRemaining != nil {
+		if *state.learnedRemaining < 0 {
+			return 0
+		}
+		return int(*state.learnedRemaining)
+	}
+	window := currentWindow(m.clock())
+	if state.window != window {
+		return state.limit.Tokens
+	}
+	remaining := state.limit.Tokens - state.used.Tokens
+	if remaining < 0 {
+		return 0
+	}
+	return remaining
 }
 
 func currentWindow(t time.Time) string {
