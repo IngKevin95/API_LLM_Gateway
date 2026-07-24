@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 )
 
 // Message es un turno de conversación en formato interno (estilo OpenAI).
@@ -50,7 +51,8 @@ type Request struct {
 type Response struct {
 	Content    string
 	ToolCalls  []ToolCall
-	ProviderID string // Injected by failover engine
+	ProviderID string    // Injected by failover engine
+	QuotaInfo  QuotaInfo // Learned quota from response headers (HU-EVO-006)
 }
 
 // Embedding es la respuesta normalizada de embeddings.
@@ -80,6 +82,12 @@ type ProviderError struct {
 	Status    int
 	Retryable bool // true para 5xx/429/timeout; false para 400 (cliente)
 	Err       error
+
+	// RetryAfter: valor del header Retry-After (segundos) que el proveedor
+	// solicitó esperar antes de reintentar, solo relevante para Status==429.
+	// 0 significa que el proveedor no especificó Retry-After (el receptor
+	// aplica su propio default/backoff, ej. health.Monitor.RetireOn429).
+	RetryAfter time.Duration
 }
 
 func (e *ProviderError) Error() string {

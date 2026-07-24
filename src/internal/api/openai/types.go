@@ -4,12 +4,12 @@ import "encoding/json"
 
 // ChatCompletionRequest represents the standard OpenAI chat payload.
 type ChatCompletionRequest struct {
-	Model       string           `json:"model"`
-	Messages    []Message        `json:"messages"`
-	Stream      bool             `json:"stream,omitempty"`
-	MaxTokens   int              `json:"max_tokens,omitempty"`
-	Temperature float64          `json:"temperature,omitempty"`
-	Tools       []Tool           `json:"tools,omitempty"`
+	Model       string    `json:"model"`
+	Messages    []Message `json:"messages"`
+	Stream      bool      `json:"stream,omitempty"`
+	MaxTokens   int       `json:"max_tokens,omitempty"`
+	Temperature float64   `json:"temperature,omitempty"`
+	Tools       []Tool    `json:"tools,omitempty"`
 }
 
 type Message struct {
@@ -40,9 +40,9 @@ type ChatCompletionResponse struct {
 }
 
 type Choice struct {
-	Index        int      `json:"index"`
-	Message      Message  `json:"message"`
-	FinishReason string   `json:"finish_reason"`
+	Index        int     `json:"index"`
+	Message      Message `json:"message"`
+	FinishReason string  `json:"finish_reason"`
 }
 
 type Usage struct {

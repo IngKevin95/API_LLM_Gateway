@@ -65,7 +65,7 @@ func TestEngine_InsufficientData(t *testing.T) {
 func TestEngine_Guardrails(t *testing.T) {
 	mp := &mockMetricProvider{
 		data: []learning.ModelStats{
-			{Model: "gpt-4", Samples: 150, AvgLatency: 10, SuccessRate: 0.99}, // Super fast
+			{Model: "gpt-4", Samples: 150, AvgLatency: 10, SuccessRate: 0.99},      // Super fast
 			{Model: "claude-3", Samples: 150, AvgLatency: 5000, SuccessRate: 0.99}, // Super slow
 		},
 	}

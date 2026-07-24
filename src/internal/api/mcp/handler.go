@@ -174,9 +174,9 @@ type jsonRPCResponse struct {
 }
 
 type jsonRPCError struct {
-	Jsonrpc string     `json:"jsonrpc"`
-	ID      any        `json:"id"`
-	Error   *rpcError  `json:"error"`
+	Jsonrpc string    `json:"jsonrpc"`
+	ID      any       `json:"id"`
+	Error   *rpcError `json:"error"`
 }
 
 type rpcError struct {
@@ -186,11 +186,11 @@ type rpcError struct {
 
 // JSON-RPC error codes (MCP usa los estándar JSON-RPC + extensiones).
 const (
-	codeParseError     = -32700
-	codeInvalidRequest = -32600
-	codeMethodNotFound = -32601
-	codeInvalidParams  = -32602
-	codeUnauthorized   = -32000
+	codeParseError      = -32700
+	codeInvalidRequest  = -32600
+	codeMethodNotFound  = -32601
+	codeInvalidParams   = -32602
+	codeUnauthorized    = -32000
 	codeVersionMismatch = -32001
 )
 

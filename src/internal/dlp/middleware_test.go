@@ -49,7 +49,7 @@ func TestMiddleware_RedactTimeout(t *testing.T) {
 
 	input := `{"message": "Mi correo es admin@empresa.com"}`
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(input))
-	
+
 	// Cancelamos el contexto base para garantizar que el motor vea el timeout
 	ctx, cancel := context.WithCancel(req.Context())
 	cancel()

@@ -20,6 +20,14 @@ func writeConfig(t *testing.T, body string) string {
 	return p
 }
 
+// writeFile escribe body en path (helper compartido con freetier_test.go).
+func writeFile(t *testing.T, path, body string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatalf("escribir fixture %s: %v", path, err)
+	}
+}
+
 const validYAML = `
 providers:
   - id: openai
@@ -155,7 +163,8 @@ routing:
 
 // AC5 — Happy: parámetros de red físicos (max_in_flight, stream_idle_timeout) expuestos.
 func TestLoad_NetworkParams_Exposed(t *testing.T) {
-	t.Setenv("OPENAI_API_KEY", "sk-x"); t.Setenv("ANTHROPIC_API_KEY", "sk-y")
+	t.Setenv("OPENAI_API_KEY", "sk-x")
+	t.Setenv("ANTHROPIC_API_KEY", "sk-y")
 	reg, err := Load(writeConfig(t, validYAML), nil)
 	if err != nil {
 		t.Fatalf("Load error inesperado: %v", err)

@@ -17,10 +17,10 @@ func TestQuotaManager_WithinQuota_AllowsRequest(t *testing.T) {
 	consumed := int64(100)
 
 	err := mgr.SetQuota(providerID, apiKey, quota.Window{
-		Period:    quota.Daily,
-		Limit:     quotaLimit,
-		Consumed:  consumed,
-		ResetAt:   time.Now().AddDate(0, 0, 1),
+		Period:   quota.Daily,
+		Limit:    quotaLimit,
+		Consumed: consumed,
+		ResetAt:  time.Now().AddDate(0, 0, 1),
 	})
 	if err != nil {
 		t.Fatalf("SetQuota failed: %v", err)
@@ -58,10 +58,10 @@ func TestQuotaManager_QuotaExhausted_RejectsRequest(t *testing.T) {
 	quotaLimit := int64(100)
 
 	mgr.SetQuota(providerID, apiKey, quota.Window{
-		Period:    quota.Daily,
-		Limit:     quotaLimit,
-		Consumed:  quotaLimit, // Agotada
-		ResetAt:   time.Now().AddDate(0, 0, 1),
+		Period:   quota.Daily,
+		Limit:    quotaLimit,
+		Consumed: quotaLimit, // Agotada
+		ResetAt:  time.Now().AddDate(0, 0, 1),
 	})
 
 	// Cuando: llega una petición
@@ -85,10 +85,10 @@ func TestQuotaManager_WindowReset_ResetsCounter(t *testing.T) {
 	// Dado: cuota agotada
 	pastReset := time.Now().Add(-time.Hour)
 	mgr.SetQuota(providerID, apiKey, quota.Window{
-		Period:    quota.Daily,
-		Limit:     100,
-		Consumed:  100,
-		ResetAt:   pastReset, // Ya pasó la hora de reset
+		Period:   quota.Daily,
+		Limit:    100,
+		Consumed: 100,
+		ResetAt:  pastReset, // Ya pasó la hora de reset
 	})
 
 	// Cuando: se valida después del reset
@@ -108,10 +108,10 @@ func TestQuotaManager_TokenLimit_RejectsIfExceeds(t *testing.T) {
 
 	// Dado: 1M token/día casi alcanzado, 999k consumidos, 1k restante
 	mgr.SetQuota(providerID, apiKey, quota.Window{
-		Period:    quota.Daily,
-		Limit:     1_000_000,
-		Consumed:  999_000, // 1k restante
-		ResetAt:   time.Now().AddDate(0, 0, 1),
+		Period:   quota.Daily,
+		Limit:    1_000_000,
+		Consumed: 999_000, // 1k restante
+		ResetAt:  time.Now().AddDate(0, 0, 1),
 	})
 
 	// Cuando: llega petición que excedería (50k tokens)
@@ -131,10 +131,10 @@ func TestQuotaManager_RaceConditions_AtomicValidation(t *testing.T) {
 
 	// Dado: 1 token restante
 	mgr.SetQuota(providerID, apiKey, quota.Window{
-		Period:    quota.Daily,
-		Limit:     100,
-		Consumed:  99,
-		ResetAt:   time.Now().AddDate(0, 0, 1),
+		Period:   quota.Daily,
+		Limit:    100,
+		Consumed: 99,
+		ResetAt:  time.Now().AddDate(0, 0, 1),
 	})
 
 	// Cuando: 50 goroutines intentan consumir simultáneamente

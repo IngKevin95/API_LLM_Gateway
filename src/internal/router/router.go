@@ -151,13 +151,20 @@ func (r *Router) scoreAll(models []registry.Model) map[string]float64 {
 	quMin, quMax := extent(models, func(m registry.Model) float64 { return float64(r.quota.Remaining(m.ProviderID, m.Name)) })
 
 	for _, m := range models {
-		qN := norm(float64(m.QualityScore), qMin, qMax)           // mayor calidad, mejor
-		latN := 1 - norm(float64(m.LatencyP50ms), lMin, lMax)     // menor latencia, mejor
-		speedN := latN                                            // velocidad ≈ inverso de latencia (hasta tener throughput real)
-		costN := 1 - norm(float64(m.CostPer1M), cMin, cMax)       // menor costo, mejor
+		qN := norm(float64(m.QualityScore), qMin, qMax)       // mayor calidad, mejor
+		latN := 1 - norm(float64(m.LatencyP50ms), lMin, lMax) // menor latencia, mejor
+		speedN := latN                                        // velocidad ≈ inverso de latencia (hasta tener throughput real)
+		costN := 1 - norm(float64(m.CostPer1M), cMin, cMax)   // menor costo, mejor
 		quotaN := norm(float64(r.quota.Remaining(m.ProviderID, m.Name)), quMin, quMax)
 		availN := 1.0 // candidatos ya pasaron el filtro de salud
-		penalization := 0.0 // HU-XXX: P (fallos recientes) pendiente de alimentar desde CircuitBreaker
+
+		// HU-EVO-009: Penalizar si remaining < 20% del máximo disponible entre candidatos
+		penalization := 0.0
+		remaining := float64(r.quota.Remaining(m.ProviderID, m.Name))
+		threshold := quMax * 0.2 // 20% del máximo remaining
+		if remaining < threshold {
+			penalization = 1.0 // máxima penalización cuando cuota baja
+		}
 
 		out[m.Name] = wQuality*qN + wCost*costN + wLatency*latN +
 			wSpeed*speedN + wAvail*availN + wQuota*quotaN - (wPenalty * penalization)

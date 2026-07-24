@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"time"
 
 	"api-llm-gateway/internal/adapter"
@@ -47,6 +48,11 @@ type Engine struct {
 	// Breaker (opcional) hace fast-fail de proveedores tripped y los penaliza
 	// ante fallos, para prevenir Failover Suicide.
 	Breaker CircuitBreaker
+
+	// OnRateLimited (opcional, HU-EVO-004) se invoca cuando un adapter devuelve
+	// 429; retryAfter es 0 si el proveedor no declaró Retry-After (el receptor
+	// aplica su propio default/backoff, ej. health.Monitor.RetireOn429).
+	OnRateLimited func(providerID string, retryAfter time.Duration)
 }
 
 var errBreakerOpen = errors.New("circuit breaker abierto")
@@ -111,6 +117,9 @@ func (e *Engine) Complete(ctx context.Context, capability string, req adapter.Re
 		// Retryable: penaliza al proveedor (breaker) y prueba el siguiente eslabón.
 		if e.Breaker != nil {
 			e.Breaker.Trip(m.ProviderID)
+		}
+		if e.OnRateLimited != nil && pe != nil && pe.Status == http.StatusTooManyRequests {
+			e.OnRateLimited(m.ProviderID, pe.RetryAfter)
 		}
 		lastErr = cerr
 	}

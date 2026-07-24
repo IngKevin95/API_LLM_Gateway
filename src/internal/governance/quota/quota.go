@@ -23,8 +23,8 @@ type Manager interface {
 // LocalQuotaManager implementa gestión de cuota en RAM con lock atómico.
 // ponytail: contadores en RAM, persistencia diferida a EP-009 (sync-worker).
 type LocalQuotaManager struct {
-	mu      sync.RWMutex
-	quotas  map[string]map[string]*Window // [providerID][apiKey]
+	mu     sync.RWMutex
+	quotas map[string]map[string]*Window // [providerID][apiKey]
 }
 
 const (

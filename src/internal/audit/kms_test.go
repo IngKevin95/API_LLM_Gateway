@@ -16,7 +16,7 @@ func TestKMS_EncryptDecrypt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error cifrando: %v", err)
 	}
-	
+
 	if len(encrypted) == 0 || string(encrypted) == string(payload) {
 		t.Fatal("el payload no fue cifrado correctamente")
 	}
@@ -36,7 +36,7 @@ func TestKMS_InvalidKey(t *testing.T) {
 	// Menos de 32 bytes
 	kms := NewLocalKMS("short_key")
 	ctx := context.Background()
-	
+
 	_, _, err := kms.EncryptPayload(ctx, []byte("test"))
 	if err == nil {
 		t.Fatal("esperaba error por longitud de llave inválida")

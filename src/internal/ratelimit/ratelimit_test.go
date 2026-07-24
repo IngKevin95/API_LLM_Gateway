@@ -111,7 +111,12 @@ func TestVisionConcurrency(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		i := i
 		wg.Add(1)
-		go func() { defer wg.Done(); rec := httptest.NewRecorder(); h.ServeHTTP(rec, visReq()); codes[i] = rec.Code }()
+		go func() {
+			defer wg.Done()
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, visReq())
+			codes[i] = rec.Code
+		}()
 	}
 	time.Sleep(30 * time.Millisecond) // deja que ocupen los 2 slots
 	rec := httptest.NewRecorder()

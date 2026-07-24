@@ -1,0 +1,95 @@
+---
+id: HU-EVO-010
+titulo: Manejo de 429 con reset timeout y Retry-After
+epica: EP-EVO-002
+prioridad: Should
+complejidad: M
+estado: lista
+---
+
+# Manejo de 429 con reset timeout y Retry-After
+
+Como **manejador de failover**, quiero **que cuando un proveedor devuelva 429, se extraiga `Retry-After` header y se haga blacklist del proveedor hasta ese tiempo**, para **respetar límites de rate-limit sin violar ToS de proveedores**.
+
+## Criterios de aceptación (Given/When/Then)
+
+| # | Escenario | Given | When | Then |
+|---|-----------|-------|------|------|
+| 1 | Happy — Retry-After en segundos | Dado que Groq devuelve 429 con `Retry-After: 60` | Cuando adapter.Chat() devuelve error 429 | Entonces extrae 60, retira Groq de selección por 60s, y failover al siguiente |
+| 2 | Happy — Retry-After en fecha | Dado que Mistral devuelve 429 con `Retry-After: Wed, 23 Jul 2026 19:00:00 GMT` | Cuando adapter procesa | Entonces parsea fecha, calcula delta a ahora, usa ese tiempo |
+| 3 | Happy — sin Retry-After | Dado que un provider devuelve 429 sin header `Retry-After` | Cuando adapter procesa | Entonces asume default 30s y retira por 30s |
+| 4 | Error — 429 mid-stream | Dado que un stream comenzó correctamente | Cuando a mitad OpenAI devuelve 429 en chunk | Entonces aborta el stream, retorna error (no failover mid-stream), y retira OpenAI |
+| 5 | Edge — múltiples 429 consecutivos | Dado que Cerebras recibe 5 × 429 en 2 minutos | Cuando Health Monitor acumula | Entonces incrementa blacklist exponencialmente (30s → 60s → 120s, tope en 120s) |
+
+## Checklist INVEST
+
+- [x] Independent — orden de construcción intra-slice: requiere HU-EVO-006 (RetryAfter parseado); integra con failover existente (HU-004a); no bloquea negociación externa ni otros equipos
+- [x] Negotiable — default retry delay configurable
+- [x] Valuable — respeta ToS, evita ban
+- [x] Estimable — parsing Retry-After + blacklist duration
+- [x] Small — 1-2 días
+- [x] Testable — mock 429s con/sin Retry-After
+
+## Notas técnicas
+
+Adapter response extendido (en HU-EVO-006):
+```go
+type Error struct {
+    StatusCode int
+    Message string
+    RetryAfter *time.Duration  // Extraído de header
+}
+```
+
+Failover en `src/internal/failover/failover.go`:
+
+```go
+if err.StatusCode == 429 {
+    retryAfter := err.RetryAfter
+    if retryAfter == nil {
+        d := 30 * time.Second
+        retryAfter = &d
+    }
+    h.health.Blacklist(provider.ID, *retryAfter)
+    return h.failoverNext(capability) // Siguiente en cadena
+}
+```
+
+---
+
+## Relación con existentes
+
+- Integra: `src/internal/failover/failover.go` (HU-004a/c)
+- Usa: HU-EVO-006 (headers parseados con RetryAfter)
+- Coordina con: HU-EVO-004 (health monitor blacklist)
+
+## Estado real de implementación (actualizado tras re-verificación adversarial)
+
+Un cierre previo del slice EP-EVO-002 declaró estos AC como cumplidos sin evidencia real de
+ejecución. Tras reabrir el slice, el estado real por escenario es:
+
+- **AC1** (Retry-After en segundos): implementado y probado end-to-end.
+  `src/internal/adapter/generic/adapter.go:parseRetryAfter` → `failover.Engine.Complete` →
+  `health.RetireOn429`. Test: `integration/retry_after_test.go`,
+  `internal/health/retire429_test.go`.
+- **AC2** (Retry-After en fecha HTTP): implementado en esta corrección.
+  `generic.parseRetryAfter` ahora intenta `time.Parse(time.RFC1123, ...)` cuando el header no es
+  un entero de segundos. Test: `internal/adapter/generic/wiring_fix_test.go`.
+- **AC3** (sin Retry-After → default 30s): implementado y probado.
+  `internal/health/retire429_test.go:TestRetireOn429_NoRetryAfter_DefaultsTo30s`.
+- **AC4** (429 mid-stream): implementado en esta corrección, a nivel de
+  `generic.sseStream` (`src/internal/adapter/generic/stream.go`): detecta un evento de error
+  rate-limit en el body SSE y aborta sin failover transparente. Test:
+  `internal/adapter/generic/wiring_fix_test.go`.
+  **Nota de alcance**: `cmd/gateway/processor.go:ProcessChatStream` sigue devolviendo `501` — el
+  streaming end-to-end del gateway no está implementado (gap pre-existente del MVP, no de esta
+  historia). El fix cierra el AC al nivel de Adapter/TokenStream, que es donde esta historia lo
+  declara.
+- **AC5** (backoff exponencial 30→60→120→240s): implementado con **discrepancia menor** respecto
+  a este AC — la implementación real (`internal/health/retire429_test.go`,
+  `TestRetireOn429_ExponentialBackoff`) topa en **120s**, no en 240s como dice la tabla de arriba.
+  No bloqueante; deuda de spec/impl a conciliar en una revisión futura si se decide ajustar.
+
+**Actualización**: la persistencia a PostgreSQL de la cuota aprendida (ver HU-EVO-008) ya no está
+diferida — se implementó un `PostgresPersister` real, opt-in vía `GATEWAY_QUOTA_POSTGRES_DSN`. Ver
+el detalle en `HU-EVO-008-persistencia-quota-postgresql.md`.

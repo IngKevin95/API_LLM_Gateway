@@ -65,7 +65,7 @@ func (r *Recorder) Record(rec Record) {
 func (r *Recorder) AddFeedback(id string, feedback int) {
 	// For simplicity, we just block here or send a special message.
 	// Since UpdateFeedback might be an HTTP call from a client later,
-	// doing it sync or via another worker is fine. Let's do it sync for now 
+	// doing it sync or via another worker is fine. Let's do it sync for now
 	// since it's a separate API endpoint, but it could be async too.
 	// To make the test pass and be simple, we just call the persister.
 	_ = r.persister.UpdateFeedback(context.Background(), id, feedback)

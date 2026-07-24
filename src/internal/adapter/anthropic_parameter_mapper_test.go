@@ -30,7 +30,7 @@ func TestAnthropicParameterMapper_ClampTemperatureDifferentRange(t *testing.T) {
 	mapper := NewAnthropicParameterMapper()
 
 	params := map[string]interface{}{
-		"temperature": 2.0,   // out of range [0, 1], should clamp to 1.0
+		"temperature": 2.0, // out of range [0, 1], should clamp to 1.0
 		"max_tokens":  2048,
 	}
 
@@ -146,8 +146,8 @@ func TestAnthropicParameterMapper_TopKValidation(t *testing.T) {
 		{1, false},
 		{40, false},
 		{256, false},
-		{0, true},       // invalid
-		{-1, true},      // invalid
+		{0, true},  // invalid
+		{-1, true}, // invalid
 	}
 
 	for _, tt := range tests {
@@ -207,7 +207,7 @@ func TestAnthropicParameterMapper_NegativeTemperatureClamp(t *testing.T) {
 	mapper := NewAnthropicParameterMapper()
 
 	params := map[string]interface{}{
-		"temperature": -0.5,  // should clamp to 0.0
+		"temperature": -0.5, // should clamp to 0.0
 		"max_tokens":  2048,
 	}
 

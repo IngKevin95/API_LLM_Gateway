@@ -239,7 +239,7 @@ func TestRoundTrip_EmptyMessagesHandled(t *testing.T) {
 func TestRoundTrip_NoMessagesFieldHandled(t *testing.T) {
 	// Edge case: Responses API without messages field
 	raw := map[string]interface{}{
-		"model":           "gpt-4",
+		"model":            "gpt-4",
 		"reasoning_effort": "low",
 	}
 

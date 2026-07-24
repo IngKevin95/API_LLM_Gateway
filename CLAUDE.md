@@ -81,6 +81,25 @@ Documentos de referencia en orden de lectura:
 - `docs/13-tech-prd/api-llm-gateway.md` — especificación técnica, YAML schema, SLA
 - `docs/04-historias/HU-*.md` — 48 historias traceadas a épicas con AC en formato Given/When/Then
 
+### Coexistencia pipeline legacy (EP-001..EP-011) y arnés de build (EP-EVO-XXX)
+
+El pipeline "legacy" de discovery (`EP-001..EP-011`, historias `HU-001..HU-0XX`) **no es solo
+documentación muerta**: varias de esas historias tienen implementación real ya en el código (ej.
+`HU-053` → `src/internal/adapter/omniroute/`). No asumir que un `HU-XXX` de rango bajo es
+discovery sin construir — verificar contra `src/` antes de tocar esa área o de darla por
+redundante.
+
+- El **arnés de build** (`EP-EVO-XXX`, estado en `.claude/state/build-state.json`) es el proceso
+  vigente para nuevo trabajo, pero no reescribe retroactivamente el historial de lo ya construido
+  bajo el pipeline legacy.
+- Si una historia legacy y una historia del arnés describen el mismo alcance (caso `HU-036` vs
+  `HU-053`, ambas "adaptador OmniRoute"), se marca la legacy como `estado: obsoleta` con
+  `supersedida_por` apuntando a la del arnés, y se deja referencia cruzada en ambos archivos — la
+  del arnés queda como canónica porque es la que tiene código y tests detrás.
+- Antes de tocar código bajo un componente documentado en el pipeline legacy, revisar si existe
+  una `HU-XXX` correspondiente en `docs/04-historias/` para no duplicar ni contradecir AC ya
+  validados.
+
 ## Principio central de diseño
 
 Los agentes **no consumen modelos, consumen capacidades**:
@@ -90,7 +109,7 @@ Los agentes **no consumen modelos, consumen capacidades**:
 
 **Ningún código de agente debe referenciar OpenAI/Anthropic/Google o un modelo concreto.**
 
-<!-- BEGIN factory-build-harness v0.9.0 -->
+<!-- BEGIN factory-build-harness v0.10.0 -->
 ## Arnés de construcción (Factory Build Harness)
 
 Este proyecto instaló `@factory/factory-spec-build`, el arnés que toma el trabajo de discovery
@@ -158,13 +177,13 @@ Reglas de nomenclatura que conviene memorizar:
 `security-reviewer`, `stack-guardian`, `data-consistency-checker`, `ux-krug-reviewer`,
 `simple-design-reviewer` y `ux-fidelity-reviewer`:
 
-- PRD técnico (de dónde sale el stack): docs/13-tech-prd/api-llm-gateway.md
-- Frontera de servicios externos / IA: Capa de Adapters — única frontera con proveedores LLM externos (OpenAI, Anthropic, Google Gemini, OpenRouter, AIHubMix, locales Ollama/vLLM/LM Studio). Todo I/O no determinista se aísla ahí; traducen System Prompts y Tool Calling unificadamente.
-- Qué lógica debe ser determinista (nada de IA ahí): Model Router (score heurístico de 6 variables: calidad, velocidad, disponibilidad, cuota, costo, latencia), Failover Engine (circuit breaker pasivo, TTFT/idle timeouts, cadena de fallback) y Auth/Rate Limiting (lookup O(1), cero I/O en el auth path crítico). Reproducible y en RAM.
-- Categorías de dato sensible / PII regulada: Prompts, Respuestas y Traza de Usuarios (pueden contener PII o IP del cliente). No se persisten en el AuditLog ni se exponen en stdout; la auditoría se restringe a metadata inmutable (tokens, tiempo, status, costo, usuario, agente, herramientas, cache hit).
-- Dónde viven los secretos server-side: API Keys maestras de LLMs, secretos JWT y credenciales KMS (endpoint/key_id). Jamás versionados en config.yaml ni volcados en errores/logs; se cargan solo desde env vars o Secret Manager.
-- Decisiones de alto impacto que necesitan explicabilidad en la UX: ADR-001 — Backend enteramente en Go (Golang) para throughput con overhead p95 < 100ms bajo alta concurrencia; adaptadores idiomáticos sin frameworks pesados de IA.
-- Fuente de diseño / referencia visual del proyecto: Fase 1 MVP sin UI (endpoint JSON /metrics). Dashboard React/Next es Fase 2 (aún no existe el prototipo — puntero no confirmado).
+- PRD técnico (de dónde sale el stack): {{PRD_TECH_PATH}}
+- Frontera de servicios externos / IA: {{EXTERNAL_SERVICE_LAYER}}
+- Qué lógica debe ser determinista (nada de IA ahí): {{DETERMINISTIC_LAYER}}
+- Categorías de dato sensible / PII regulada: {{SENSITIVE_DATA_CATEGORIES}}
+- Dónde viven los secretos server-side: {{SERVER_SIDE_SECRETS}}
+- Decisiones de alto impacto que necesitan explicabilidad en la UX: {{HIGH_STAKES_DECISIONS}}
+- Fuente de diseño / referencia visual del proyecto: {{DESIGN_SOURCE}}
 
 Si algún punto sigue mostrando `{{...}}`, todavía no corriste `/build:setup`.
 

@@ -62,7 +62,7 @@ func (m *OpenAIParameterMapper) MapParameters(params map[string]interface{}) map
 			// Other standard parameters pass through
 			result[key] = value
 
-		// Unknown parameters are silently dropped
+			// Unknown parameters are silently dropped
 		}
 	}
 

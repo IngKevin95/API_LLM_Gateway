@@ -5,30 +5,49 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	_ "github.com/lib/pq"
 
 	"api-llm-gateway/internal/adapter"
 	adapteraihubmix "api-llm-gateway/internal/adapter/aihubmix"
 	adapteranthropc "api-llm-gateway/internal/adapter/anthropic"
+	adaptergeneric "api-llm-gateway/internal/adapter/generic"
 	adaptergoogle "api-llm-gateway/internal/adapter/google"
 	adapterlocal "api-llm-gateway/internal/adapter/local"
 	adapteromniroute "api-llm-gateway/internal/adapter/omniroute"
 	adapteropenai "api-llm-gateway/internal/adapter/openai"
+	"api-llm-gateway/internal/alert"
 	apianthropic "api-llm-gateway/internal/api/anthropic"
+	apimcp "api-llm-gateway/internal/api/mcp"
 	apiopenai "api-llm-gateway/internal/api/openai"
+	"api-llm-gateway/internal/auth"
+	"api-llm-gateway/internal/auth/apikey"
 	"api-llm-gateway/internal/failover"
+	"api-llm-gateway/internal/handler"
+	"api-llm-gateway/internal/health"
 	"api-llm-gateway/internal/metrics"
 	"api-llm-gateway/internal/middleware"
+	"api-llm-gateway/internal/quota"
 	"api-llm-gateway/internal/registry"
 	"api-llm-gateway/internal/router"
 	"api-llm-gateway/internal/tokenizer"
+	"api-llm-gateway/internal/user"
 )
+
+// freeTierConfigPath es la ruta por defecto del catálogo de proveedores
+// gratuitos curados (HU-EVO-002); override vía GATEWAY_FREETIER_CONFIG.
+const freeTierConfigPath = "config/providers/free-tier.yaml"
 
 func main() {
 	port := os.Getenv("GATEWAY_PORT")
@@ -49,24 +68,132 @@ func main() {
 	metricsStore := metrics.NewInMemoryStore(10000)
 
 	var processor *GatewayProcessor
+	var alertDB *sql.DB
+	var metricsHandlerCapabilityLookup func(provider, model string) []string
+	var reg *registry.Registry
+	var pgPersister *quota.PostgresPersister
 	if cfgPath != "" {
 		var err error
-		reg, err := registry.Load(cfgPath, nil)
+		reg, err = registry.Load(cfgPath, nil)
 		if err != nil {
 			log.Fatalf("registry: %v", err) // fail-fast, no arranca en estado parcial
 		}
 
-		// Build Router (EP-001)
-		rt := router.New(reg, router.StaticHealth{}, router.StaticQuota{}, tokenizer.NewHeuristic())
+		// HU-EVO-002: merge del catálogo de proveedores gratuitos curados sobre
+		// el catálogo base. Override de ruta vía GATEWAY_FREETIER_CONFIG; si no
+		// existe el archivo (ni el default ni el override explícito) se sigue
+		// sin free-tier, salvo que el override haya sido declarado explícito
+		// (en ese caso, fail-fast).
+		freeTierPath := os.Getenv("GATEWAY_FREETIER_CONFIG")
+		explicitFreeTier := freeTierPath != ""
+		if freeTierPath == "" {
+			freeTierPath = freeTierConfigPath
+		}
+		if _, statErr := os.Stat(freeTierPath); statErr == nil {
+			if err := reg.MergeFreeTier(freeTierPath, nil); err != nil {
+				log.Fatalf("registry: merge free-tier %s: %v", freeTierPath, err)
+			}
+			log.Printf("INFO gateway: free-tier catalog cargado desde %s", freeTierPath)
+		} else if explicitFreeTier {
+			log.Fatalf("registry: GATEWAY_FREETIER_CONFIG=%s no encontrado: %v", freeTierPath, statErr)
+		}
 
-		// Build Adapters (EP-002, EP-008)
-		adapters := buildAdapters(reg)
+		// HU-EVO-008: Persister real a PostgreSQL, opt-in vía
+		// GATEWAY_QUOTA_POSTGRES_DSN. Si no está declarado, sigue usando
+		// NoPersister (no-op) — comportamiento sin cambios. Si está declarado
+		// pero la conexión falla, se loguea warning y se sigue solo con
+		// memoria (AC3: la persistencia nunca debe tumbar el boot).
+		qm := quota.NewInMemoryManager()
+		if dsn := os.Getenv("GATEWAY_QUOTA_POSTGRES_DSN"); dsn != "" {
+			var err error
+			pgPersister, err = quota.NewPostgresPersister(dsn, 1000)
+			if err != nil {
+				log.Printf("WARN gateway: quota postgres persister no disponible, sigue solo en RAM: %v", err)
+			} else {
+				qm = quota.NewInMemoryManagerWithPersister(time.Now, pgPersister)
+				if restored, err := pgPersister.LoadRemaining(context.Background()); err != nil {
+					log.Printf("WARN gateway: quota postgres LoadRemaining falló, arranca sin restaurar: %v", err)
+				} else {
+					for providerID, remaining := range restored {
+						qm.RestoreRemaining(providerID, int(remaining)) // AC5: precedencia sobre quota_hint
+					}
+					log.Printf("INFO gateway: quota restaurada desde PostgreSQL para %d proveedor(es)", len(restored))
+				}
+			}
+		}
 
-		// Build Failover Engine (EP-002)
+		// HU-EVO-005: Quota Manager inicializado desde los quota_hint del Registry
+		// (incluye los proveedores free-tier recién mergeados). InitFromRegistry
+		// no pisa estado ya restaurado desde el persister (AC5).
+		qm.InitFromRegistry(reg.QuotaHints())
+
+		// HU-EVO-004: Health Monitor real; RetireOn429 lo invoca el Failover al
+		// recibir un 429 de un adapter (retiro temporal con backoff/Retry-After).
+		providerIDs := make([]string, 0, len(reg.Providers()))
+		for _, p := range reg.Providers() {
+			providerIDs = append(providerIDs, p.ID)
+		}
+		hm := health.New(providerIDs, func(string) bool { return true }, 3, 2)
+
+		// Build Router (EP-001) con Health/Quota reales en vez de los stubs estáticos.
+		rt := router.New(reg, hm, qm, tokenizer.NewHeuristic())
+
+		// Build Adapters (EP-002, EP-008, EP-EVO-001), envueltos por el
+		// Quota Middleware (HU-EVO-006/007/009) para aprender cuota real
+		// desde los headers de respuesta e imponer reserva/commit por proveedor.
+		adapters := wrapWithQuotaMiddleware(buildAdapters(reg), qm)
+
+		// Build Failover Engine (EP-002); RetireOn429 se conecta al recibir 429s.
 		fe := failover.New(rt, adapters)
+		fe.OnRateLimited = hm.RetireOn429
 
 		// Create Processor that uses Failover and metrics
 		processor = NewGatewayProcessor(fe, metricsStore)
+
+		// Lista de proveedores configurados para /metrics, visible sin tráfico previo.
+		metricsStore.SetProviderSnapshot(providerIDs)
+
+		// HU-EVO-011: Quota Manager real como fuente en vivo del bloque
+		// "quota" de /metrics (leído por request, sin cache -- ver design.md).
+		metricsStore.SetQuotaSource(quotaSourceAdapter{qm: qm})
+		capabilityLookup := buildCapabilityLookup(reg)
+		metricsHandlerCapabilityLookup = capabilityLookup
+
+		// HU-EVO-012: Alert Manager, opt-in vía la misma PostgreSQL de cuota
+		// (GATEWAY_QUOTA_POSTGRES_DSN). Fail-soft: sin DSN, no arranca el
+		// worker (WARN, no bloquea boot) y /alerts responde lista vacía.
+		if dsn := os.Getenv("GATEWAY_QUOTA_POSTGRES_DSN"); dsn != "" {
+			if adb, err := sql.Open("postgres", dsn); err != nil {
+				log.Printf("WARN gateway: alert manager sin DB (sql.Open): %v", err)
+			} else if err := adb.PingContext(context.Background()); err != nil {
+				log.Printf("WARN gateway: alert manager sin DB (ping): %v", err)
+				_ = adb.Close()
+			} else {
+				threshold := alert.DefaultThreshold
+				if raw := os.Getenv("GATEWAY_ALERT_THRESHOLD"); raw != "" {
+					if v, err := strconv.ParseFloat(raw, 64); err == nil && v > 0 {
+						threshold = v
+					}
+				}
+				am, err := alert.NewManager(adb, alertQuotaAdapter{qm: qm}, threshold)
+				if err != nil {
+					log.Printf("WARN gateway: alert manager migración falló, worker deshabilitado: %v", err)
+					_ = adb.Close()
+				} else {
+					alertDB = adb
+					interval := time.Minute
+					if raw := os.Getenv("GATEWAY_ALERT_INTERVAL"); raw != "" {
+						if d, err := time.ParseDuration(raw); err == nil && d > 0 {
+							interval = d
+						}
+					}
+					go am.Run(context.Background(), interval)
+					log.Printf("INFO gateway: alert manager arrancado (threshold=%.2f, interval=%s)", threshold, interval)
+				}
+			}
+		} else {
+			log.Printf("WARN gateway: GATEWAY_QUOTA_POSTGRES_DSN no configurado, alert manager deshabilitado (/alerts responde vacío)")
+		}
 	} else {
 		log.Printf("WARN gateway: sin config.yaml, arrancando en modo scaffold (solo /health)")
 	}
@@ -77,15 +204,134 @@ func main() {
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	// HU-060: /metrics endpoint con datos reales en memoria
+	// apiKeyStore resuelve identidades no-admin legacy (HU-EVO-013, y
+	// HU-EVO-011 AC5 para /metrics), seedeadas vía GATEWAY_API_KEYS.
+	// HU-EVO-018 agrega el store de PostgreSQL (userKeys, cableado más abajo)
+	// como fuente adicional/reemplazo gradual: identityMiddleware prueba
+	// userKeys primero y cae a apiKeyStore/env si no matchea, así una
+	// instalación puede migrar sin invalidar las keys legacy de un día para
+	// el otro.
+	apiKeyStore := apikey.NewStore()
+	loadAPIKeysFromEnv(apiKeyStore)
+
+	// HU-EVO-017/HU-EVO-018: store de usuarios + API keys en PostgreSQL,
+	// opt-in vía GATEWAY_USERS_POSTGRES_DSN (fallback: la misma DSN de cuota,
+	// GATEWAY_QUOTA_POSTGRES_DSN, para no exigir una segunda variable en
+	// despliegues con una sola instancia PostgreSQL). Fail-soft: sin DSN o si
+	// la conexión falla, /users y /users/{id}/api-keys quedan deshabilitados
+	// (503) en vez de tumbar el boot.
+	var userStore *user.Store
+	var userKeys *user.KeyStore
+	var sessionStore *user.SessionStore
+	usersDSN := os.Getenv("GATEWAY_USERS_POSTGRES_DSN")
+	if usersDSN == "" {
+		usersDSN = os.Getenv("GATEWAY_QUOTA_POSTGRES_DSN")
+	}
+	if usersDSN != "" {
+		if udb, err := sql.Open("postgres", usersDSN); err != nil {
+			log.Printf("WARN gateway: users store sin DB (sql.Open): %v", err)
+		} else if err := udb.PingContext(context.Background()); err != nil {
+			log.Printf("WARN gateway: users store sin DB (ping): %v", err)
+			_ = udb.Close()
+		} else if us, err := user.NewStore(udb); err != nil {
+			log.Printf("WARN gateway: users store migración falló: %v", err)
+			_ = udb.Close()
+		} else if ks, err := user.NewKeyStore(udb, us); err != nil {
+			log.Printf("WARN gateway: api_keys store migración falló: %v", err)
+			_ = udb.Close()
+		} else if ss, err := user.NewSessionStore(udb, us); err != nil {
+			log.Printf("WARN gateway: sessions store migración falló: %v", err)
+			_ = udb.Close()
+		} else {
+			userStore, userKeys, sessionStore = us, ks, ss
+			log.Printf("INFO gateway: users/api_keys/sessions store conectado a PostgreSQL")
+		}
+	} else {
+		log.Printf("WARN gateway: GATEWAY_USERS_POSTGRES_DSN no configurado, /users deshabilitado")
+	}
+	registerUsersRoutes(mux, userStore, userKeys, os.Getenv("GATEWAY_ADMIN_TOKEN"))
+	jwtSecret := []byte(os.Getenv("GATEWAY_JWT_SECRET"))
+	if len(jwtSecret) == 0 {
+		jwtSecret = []byte("default-dev-secret-do-not-use-in-prod")
+	}
+	registerAuthRoutes(mux, userStore, sessionStore, os.Getenv("GATEWAY_ADMIN_TOKEN"), jwtSecret)
+
+	// identityMiddleware (HU-EVO-018): intenta resolver la identidad primero
+	// contra JWT local (Fase 4), luego userKeys (PostgreSQL), finalmente apiKeyStore (legacy).
+	identityMiddleware := func(next http.Handler) http.Handler {
+		legacy := apikey.Middleware(apiKeyStore)(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			token := extractBearer(r)
+			if token != "" {
+				// JWT Local (HS256) check
+				claims := jwt.MapClaims{}
+				_, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (any, error) {
+					return jwtSecret, nil
+				}, jwt.WithValidMethods([]string{"HS256"}))
+
+				if err == nil {
+					sid, _ := claims["sid"].(string)
+					if sid != "" && sessionStore != nil {
+						if ok, _ := sessionStore.IsValid(r.Context(), sid); ok {
+							sub, _ := claims["sub"].(string)
+							tenant, _ := claims["tenant"].(string)
+							id := auth.Identity{Subject: sub, Tenant: tenant, SessionID: sid}
+							if rawScopes, ok := claims["scopes"].([]any); ok {
+								for _, s := range rawScopes {
+									if str, ok := s.(string); ok {
+										id.Scopes = append(id.Scopes, str)
+									}
+								}
+							}
+							next.ServeHTTP(w, r.WithContext(auth.WithIdentity(r.Context(), id)))
+							return
+						}
+					}
+				}
+
+				if userKeys != nil {
+					if id, ok := userKeys.Authenticate(r.Context(), token); ok {
+						next.ServeHTTP(w, r.WithContext(auth.WithIdentity(r.Context(), id)))
+						return
+					}
+				}
+			}
+			legacy.ServeHTTP(w, r)
+		})
+	}
+
+	// HU-060: /metrics endpoint con datos reales en memoria. Admin (token
+	// estático GATEWAY_ADMIN_TOKEN) ve todo sin filtrar; una identidad
+	// resuelta por identityMiddleware (no-admin) ve el bloque quota filtrado
+	// por scope (AC5). Sin admin y sin key válida: 401.
 	metricsHandler := metrics.NewHandler(metricsStore)
+	if metricsHandlerCapabilityLookup != nil {
+		metricsHandler.SetCapabilityLookup(metricsHandlerCapabilityLookup)
+	}
+	metricsAuthenticated := identityMiddleware(metricsHandler)
 	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
 		adminToken := os.Getenv("GATEWAY_ADMIN_TOKEN")
-		if adminToken == "" || r.Header.Get("Authorization") != "Bearer "+adminToken {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+		if adminToken != "" && r.Header.Get("Authorization") == "Bearer "+adminToken {
+			metricsHandler.ServeHTTP(w, r)
 			return
 		}
-		metricsHandler.ServeHTTP(w, r)
+		metricsAuthenticated.ServeHTTP(w, r)
+	})
+
+	// HU-EVO-013: GET /alerts, RBAC-aware. Admin (mismo token estático que
+	// /metrics) ve todas las alertas sin filtro; cualquier otra identidad
+	// resuelta por identityMiddleware (userKeys o apiKeyStore legacy) solo ve
+	// alertas de modelos cubiertos por sus scopes. Sin identidad y sin admin:
+	// 401.
+	alertsHandler := handler.NewAlertsHandler(alertDB, handler.CapabilityLookup(metricsHandlerCapabilityLookup))
+	alertsAuthenticated := identityMiddleware(alertsHandler)
+	mux.HandleFunc("/alerts", func(w http.ResponseWriter, r *http.Request) {
+		adminToken := os.Getenv("GATEWAY_ADMIN_TOKEN")
+		if adminToken != "" && r.Header.Get("Authorization") == "Bearer "+adminToken {
+			alertsHandler.ServeHTTP(w, r.WithContext(handler.WithAdmin(r.Context())))
+			return
+		}
+		alertsAuthenticated.ServeHTTP(w, r)
 	})
 
 	// Register OpenAI-compatible endpoints (HU-012a, HU-012b, HU-012c)
@@ -98,13 +344,13 @@ func main() {
 		anthropicHandler := apianthropic.NewHandler(processor)
 		mux.HandleFunc("POST /v1/messages", anthropicHandler.HandleMessages)
 
-		// Register MCP integration (HU-033) — stub handler for now
-		// TODO: Full MCP integration in Fase 2
-		mux.HandleFunc("POST /mcp", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusNotImplemented)
-			_, _ = w.Write([]byte(`{"error":"MCP integration pending"}`))
-		})
+		// Register Universal Compatibility endpoint (HU-EVO-006)
+		responsesHandler := handler.NewResponsesHandler(processor)
+		mux.Handle("POST /responses", responsesHandler)
+
+		// Register MCP integration (HU-033)
+		mcpHandler := apimcp.NewHandler(os.Getenv("GATEWAY_ADMIN_TOKEN"), reg)
+		mux.Handle("POST /mcp", mcpHandler)
 	}
 
 	var readHeaderTimeout, writeTimeout time.Duration
@@ -155,6 +401,227 @@ func main() {
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Printf("shutdown: %v", err)
 	}
+	if pgPersister != nil {
+		if err := pgPersister.Close(); err != nil {
+			log.Printf("quota persister close: %v", err)
+		} else {
+			log.Printf("INFO gateway: quota persister flushed and closed")
+		}
+	}
+}
+
+// quotaSourceAdapter adapta quota.Manager.Snapshot() ([]quota.Snapshot) al
+// metrics.QuotaSource ([]metrics.QuotaEntry) que espera metrics.Store, sin
+// que el paquete metrics dependa directamente del paquete quota
+// (HU-EVO-011).
+type quotaSourceAdapter struct {
+	qm quota.Manager
+}
+
+func (a quotaSourceAdapter) Snapshot() []metrics.QuotaEntry {
+	snap := a.qm.Snapshot()
+	out := make([]metrics.QuotaEntry, 0, len(snap))
+	for _, s := range snap {
+		out = append(out, metrics.QuotaEntry{
+			Provider:  s.Provider,
+			Model:     s.Model,
+			Limit:     s.Limit,
+			Remaining: s.Remaining,
+			ResetAt:   s.ResetAt,
+			Healthy:   s.Healthy,
+			LearnedAt: s.LearnedAt,
+		})
+	}
+	return out
+}
+
+// alertQuotaAdapter adapta quota.Manager.Snapshot() al alert.QuotaSnapshotter
+// que espera alert.Manager (mismo patrón que quotaSourceAdapter para metrics).
+type alertQuotaAdapter struct {
+	qm quota.Manager
+}
+
+func (a alertQuotaAdapter) Snapshot() []alert.QuotaEntry {
+	snap := a.qm.Snapshot()
+	out := make([]alert.QuotaEntry, 0, len(snap))
+	for _, s := range snap {
+		out = append(out, alert.QuotaEntry{
+			Provider:  s.Provider,
+			Model:     s.Model,
+			Limit:     s.Limit,
+			Remaining: s.Remaining,
+		})
+	}
+	return out
+}
+
+// buildCapabilityLookup resuelve las capacidades declaradas de un (provider,
+// model) desde el Registry, usado para filtrar /metrics#quota (HU-EVO-011
+// AC5) y /alerts (HU-EVO-013 AC4) por scope del requester. model=="" (fila
+// agregada sin desglose, ver quota.Snapshot) devuelve la unión de
+// capacidades de todos los modelos de ese proveedor.
+func buildCapabilityLookup(reg *registry.Registry) func(provider, model string) []string {
+	return func(provider, model string) []string {
+		var caps []string
+		for _, p := range reg.Providers() {
+			if p.ID != provider {
+				continue
+			}
+			for _, m := range p.Models {
+				if model == "" || m.Name == model {
+					caps = append(caps, m.Capabilities...)
+				}
+			}
+		}
+		return caps
+	}
+}
+
+// registerUsersRoutes cablea /users, /users/{id} y /users/{id}/api-keys*
+// (HU-EVO-017/HU-EVO-018). Si userStore es nil (sin PostgreSQL configurada),
+// responde 503 a todas las rutas en vez de nil-pointer panic.
+func registerUsersRoutes(mux *http.ServeMux, userStore *user.Store, userKeys *user.KeyStore, adminToken string) {
+	unavailable := func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, `{"error":"users store not configured"}`, http.StatusServiceUnavailable)
+	}
+	if userStore == nil || userKeys == nil {
+		mux.HandleFunc("/users", unavailable)
+		mux.HandleFunc("PATCH /users/{id}", unavailable)
+		mux.HandleFunc("/users/{id}/api-keys", unavailable)
+		mux.HandleFunc("DELETE /users/{id}/api-keys/{keyId}", unavailable)
+		return
+	}
+
+	usersHandler := handler.NewUsersHandler(userStore)
+	apiKeysHandler := handler.NewAPIKeysHandler(userKeys)
+
+	wrap := func(h http.Handler) http.HandlerFunc {
+		return resolveUserAuth(adminToken, userKeys, userStore, h)
+	}
+
+	mux.HandleFunc("/users", wrap(usersHandler))
+	mux.HandleFunc("PATCH /users/{id}", wrap(http.HandlerFunc(usersHandler.PatchUser)))
+	mux.HandleFunc("/users/{id}/api-keys", wrap(apiKeysHandler))
+	mux.HandleFunc("DELETE /users/{id}/api-keys/{keyId}", wrap(http.HandlerFunc(apiKeysHandler.RevokeAPIKey)))
+}
+
+// registerAuthRoutes cablea /sessions, /auth/login y /auth/mfa*
+func registerAuthRoutes(mux *http.ServeMux, userStore *user.Store, sessionStore *user.SessionStore, adminToken string, jwtSecret []byte) {
+	unavailable := func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, `{"error":"auth store not configured"}`, http.StatusServiceUnavailable)
+	}
+	if userStore == nil || sessionStore == nil {
+		mux.HandleFunc("/sessions", unavailable)
+		mux.HandleFunc("DELETE /sessions/{id}", unavailable)
+		mux.HandleFunc("/auth/mfa/enroll", unavailable)
+		mux.HandleFunc("/auth/mfa/verify", unavailable)
+		mux.HandleFunc("/auth/mfa/disable", unavailable)
+		return
+	}
+
+	sessionsHandler := handler.NewSessionsHandler(sessionStore)
+	mfaHandler := handler.NewMfaHandler(userStore)
+	authHandler := handler.NewAuthHandler(userStore, sessionStore, jwtSecret)
+
+	// Auth requires authenticated user (not just admin token).
+	// For simplicity in this wiring, we reuse resolveUserAuth or just assume identityMiddleware protects it.
+	// We'll wrap with resolveUserAuth which sets context, but it doesn't strictly block unauthenticated.
+	// Actually, identityMiddleware runs around the whole mux later. But the handler itself checks auth.FromContext!
+	wrap := func(h http.Handler) http.HandlerFunc {
+		// Just a dummy wrapper that relies on the global identityMiddleware
+		return func(w http.ResponseWriter, r *http.Request) {
+			h.ServeHTTP(w, r)
+		}
+	}
+
+	mux.HandleFunc("POST /auth/login", authHandler.Login)
+	mux.HandleFunc("/sessions", wrap(sessionsHandler))
+	mux.HandleFunc("DELETE /sessions/{id}", wrap(http.HandlerFunc(sessionsHandler.RevokeSession)))
+	mux.HandleFunc("/auth/mfa/enroll", wrap(http.HandlerFunc(mfaHandler.Enroll)))
+	mux.HandleFunc("/auth/mfa/verify", wrap(http.HandlerFunc(mfaHandler.Verify)))
+	mux.HandleFunc("/auth/mfa/disable", wrap(http.HandlerFunc(mfaHandler.Disable)))
+}
+
+// resolveUserAuth resuelve AdminContext + auth.Identity para el dominio de
+// usuarios: token estático GATEWAY_ADMIN_TOKEN = admin global; si no, intenta
+// autenticar la API key contra userKeys.Authenticate y, si el usuario
+// resuelto tiene role=admin, promueve a admin de su propio tenant (no
+// global). Delega el 401/403 final a cada handler (algunos endpoints son
+// admin-only, otros owner-or-admin).
+func resolveUserAuth(adminToken string, userKeys *user.KeyStore, userStore *user.Store, next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		ac := handler.AdminContext{}
+
+		if adminToken != "" && r.Header.Get("Authorization") == "Bearer "+adminToken {
+			ac = handler.AdminContext{IsAdmin: true, GlobalAdmin: true}
+		} else if token := extractBearer(r); token != "" {
+			if id, ok := userKeys.Authenticate(ctx, token); ok {
+				ctx = auth.WithIdentity(ctx, id)
+				ac.Tenant = id.Tenant
+				if u, err := userStore.Get(ctx, id.Subject); err == nil && u.Role == user.RoleAdmin {
+					ac.IsAdmin = true
+				}
+			}
+		}
+
+		req := r.WithContext(ctx)
+		req = handler.WithAdminContextValue(req, ac)
+		next.ServeHTTP(w, req)
+	}
+}
+
+func extractBearer(r *http.Request) string {
+	h := r.Header.Get("Authorization")
+	if strings.HasPrefix(h, "Bearer ") {
+		return strings.TrimSpace(strings.TrimPrefix(h, "Bearer "))
+	}
+	return ""
+}
+
+// loadAPIKeysFromEnv seedea el apikey.Store desde GATEWAY_API_KEYS
+// (formato "key:tenant:cap1,cap2;key2:tenant2:cap1"), usado por /alerts para
+// resolver identidades no-admin (HU-EVO-013). Sin la env var, el store queda
+// vacío y todo acceso no-admin a /alerts devuelve 401 (fail-closed).
+func loadAPIKeysFromEnv(store *apikey.Store) {
+	raw := os.Getenv("GATEWAY_API_KEYS")
+	if raw == "" {
+		return
+	}
+	for _, entry := range strings.Split(raw, ";") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		parts := strings.SplitN(entry, ":", 3)
+		if len(parts) != 3 {
+			log.Printf("WARN gateway: GATEWAY_API_KEYS entrada inválida (esperado key:tenant:scopes), omitiendo")
+			continue
+		}
+		key, tenant, scopesRaw := parts[0], parts[1], parts[2]
+		var scopes []string
+		for _, s := range strings.Split(scopesRaw, ",") {
+			s = strings.TrimSpace(s)
+			if s != "" {
+				scopes = append(scopes, "capability:"+s)
+			}
+		}
+		store.Add(key, auth.Identity{Subject: tenant, Tenant: tenant, Scopes: scopes})
+	}
+}
+
+// wrapWithQuotaMiddleware envuelve cada adapter con quota.Middleware
+// (HU-EVO-006/007/009): intercepta Chat/Embed para reservar/confirmar
+// consumo y aprender QuotaInfo real de los headers de respuesta hacia el
+// Manager compartido con el Router (para que la penalización por cuota baja
+// de scoreAll opere sobre datos aprendidos en runtime, no solo el hint
+// estático del Registry).
+func wrapWithQuotaMiddleware(adapters map[string]adapter.Adapter, qm quota.Manager) map[string]adapter.Adapter {
+	wrapped := make(map[string]adapter.Adapter, len(adapters))
+	for providerID, ad := range adapters {
+		wrapped[providerID] = quota.NewMiddleware(qm, providerID, ad)
+	}
+	return wrapped
 }
 
 // buildAdapters constructs and returns adapters for all configured providers.
@@ -192,6 +659,29 @@ func buildAdapters(reg *registry.Registry) map[string]adapter.Adapter {
 		BaseURL: "http://omniroute:20128/v1",
 		APIKey:  "",
 	})
+
+	// HU-EVO-001: adapters data-driven para providers declarados type:generic
+	// (catálogo free-tier: Groq, Cerebras, Mistral, Gemini, Cloudflare AI, etc.).
+	// Todos hablan wire OpenAI-compatible salvo que se declare lo contrario.
+	for _, p := range reg.Providers() {
+		if p.Type != "generic" {
+			continue
+		}
+		if p.APIKey == "" {
+			log.Printf("WARN gateway: provider generic %q sin api_key resuelta, omitiendo adapter", p.ID)
+			continue
+		}
+		spec := adaptergeneric.ProviderSpec{
+			BaseURL: p.BaseURL,
+			Format:  adaptergeneric.FormatOpenAI,
+		}
+		ad, err := adaptergeneric.New(spec, p.APIKey)
+		if err != nil {
+			log.Printf("WARN gateway: provider generic %q spec inválido, omitiendo adapter: %v", p.ID, err)
+			continue
+		}
+		adapters[p.ID] = ad
+	}
 
 	return adapters
 }

@@ -1,28 +1,28 @@
-# health-monitor Specification
+## ADDED Requirements
 
-## Purpose
-TBD - created by archiving change ep-002-resiliencia-conectividad. Update Purpose after archive.
-## Requirements
-### Requirement: Sondeo periódico con retiro y reactivación
-El Health Monitor SHALL sondear periódicamente cada proveedor, retirarlo al fallar los checks, reactivarlo al recuperarse, y exponer el estado de salud vivo como `HealthSource` del router. (Traza: HU-005)
+### Requirement: Detección de 429 con retiro temporal y backoff
+El Health Monitor SHALL detectar respuestas HTTP 429 de cualquier proveedor, retirarlo
+temporalmente de la selección del Router respetando `Retry-After` (o un default de 30s si el
+header está ausente), reactivarlo automáticamente al vencer el retiro, abortar streams mid-stream
+sin aplicar failover transparente, y aplicar backoff exponencial ante 429 repetidos.
+(Traza: HU-EVO-004)
 
-#### Scenario: Proveedor sano se mantiene
-- **WHEN** un proveedor responde OK a los health checks durante el ciclo
-- **THEN** permanece marcado sano y en la rotación
+#### Scenario: Proveedor recupera tras 429
+- **WHEN** Health Monitor lanza un health check contra un proveedor que respondió 429 hace 30s
+- **THEN** ve respuesta 200, marca el proveedor como `healthy=true` y lo reactiva en el Router
 
-#### Scenario: Caída detectada y retiro
-- **WHEN** un proveedor empieza a devolver errores en los health checks
-- **THEN** se marca no-sano y deja de recibir peticiones nuevas hasta recuperarse
+#### Scenario: Retiro temporal respetando Retry-After
+- **WHEN** un request a un proveedor devuelve 429 con header `Retry-After: 60`
+- **THEN** Health Monitor retira ese proveedor de la selección por 60s y lo reactiva automáticamente después
 
-#### Scenario: Reactivación automática
-- **WHEN** un proveedor no-sano vuelve a responder OK en el siguiente check
-- **THEN** se marca sano y vuelve a la rotación automáticamente
+#### Scenario: 429 sin Retry-After usa default
+- **WHEN** un proveedor devuelve 429 sin header `Retry-After`
+- **THEN** Health Monitor asume un default de 30s, retira el proveedor y lo reactiva después de ese tiempo
 
-#### Scenario: Todos no-sanos
-- **WHEN** todos los proveedores de una capacidad fallan los checks y llega una petición de esa capacidad
-- **THEN** la Gateway responde 503 y el estado refleja la capacidad como no disponible
+#### Scenario: 429 mid-stream aborta sin failover transparente
+- **WHEN** un Stream en curso recibe 429 a mitad de la emisión
+- **THEN** Health Monitor aborta el stream, retorna error al cliente y retira el proveedor; no hay failover transparente mid-stream
 
-#### Scenario: Proveedor intermitente con histéresis
-- **WHEN** un proveedor alterna OK/fallo entre checks durante varios ciclos
-- **THEN** se aplica histéresis (N fallos para retirar, M éxitos para reactivar) para evitar oscilación
-
+#### Scenario: Backoff exponencial ante 429 repetidos
+- **WHEN** un proveedor recibe 3 respuestas 429 en 10s
+- **THEN** Health Monitor incrementa la duración del retiro exponencialmente (30s → 60s → 120s)

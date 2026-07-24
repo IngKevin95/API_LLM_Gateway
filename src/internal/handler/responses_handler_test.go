@@ -2,18 +2,30 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"api-llm-gateway/internal/adapter"
 )
+
+type mockProcessor struct{}
+
+func (m *mockProcessor) ProcessChat(ctx context.Context, req *adapter.Request) (*adapter.Response, error) {
+	return &adapter.Response{
+		ProviderID: "mock-provider",
+		Content:    "mock response",
+	}, nil
+}
 
 func TestResponsesHandler_AcceptsUniversalFormat(t *testing.T) {
 	// /responses should accept universal normalized format
 	payload := map[string]interface{}{
-		"format":   "universal",
-		"messages": []map[string]string{{"role": "user", "content": "hello"}},
-		"model":    "router:chat",
+		"format":     "universal",
+		"messages":   []map[string]string{{"role": "user", "content": "hello"}},
+		"model":      "router:chat",
 		"max_tokens": 1024,
 	}
 
@@ -22,7 +34,7 @@ func TestResponsesHandler_AcceptsUniversalFormat(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 
 	w := httptest.NewRecorder()
-	handler := NewResponsesHandler()
+	handler := NewResponsesHandler(&mockProcessor{})
 	handler.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK && w.Code != http.StatusBadRequest {
@@ -44,7 +56,7 @@ func TestResponsesHandler_CapabilityInferenceFromPayload(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 
 	w := httptest.NewRecorder()
-	handler := NewResponsesHandler()
+	handler := NewResponsesHandler(&mockProcessor{})
 	handler.ServeHTTP(w, req)
 
 	// Should handle request (capability inference happens internally)
@@ -59,7 +71,7 @@ func TestResponsesHandler_RouterPrefixSupport(t *testing.T) {
 		"messages": []map[string]string{
 			{"role": "user", "content": "hello"},
 		},
-		"model": "router:chat",
+		"model":      "router:chat",
 		"max_tokens": 1024,
 	}
 
@@ -68,7 +80,7 @@ func TestResponsesHandler_RouterPrefixSupport(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 
 	w := httptest.NewRecorder()
-	handler := NewResponsesHandler()
+	handler := NewResponsesHandler(&mockProcessor{})
 	handler.ServeHTTP(w, req)
 
 	// Should recognize router: prefix
@@ -90,7 +102,7 @@ func TestResponsesHandler_MissingMaxTokensValidation(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 
 	w := httptest.NewRecorder()
-	handler := NewResponsesHandler()
+	handler := NewResponsesHandler(&mockProcessor{})
 	handler.ServeHTTP(w, req)
 
 	// Should validate max_tokens requirement
@@ -105,9 +117,9 @@ func TestResponsesHandler_ParameterTranslation(t *testing.T) {
 		"messages": []map[string]string{
 			{"role": "user", "content": "hello"},
 		},
-		"model": "gpt-4",
-		"temperature": 1.5,  // OpenAI-compatible range
-		"max_tokens": 1024,
+		"model":       "gpt-4",
+		"temperature": 1.5, // OpenAI-compatible range
+		"max_tokens":  1024,
 	}
 
 	body, _ := json.Marshal(payload)
@@ -115,7 +127,7 @@ func TestResponsesHandler_ParameterTranslation(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 
 	w := httptest.NewRecorder()
-	handler := NewResponsesHandler()
+	handler := NewResponsesHandler(&mockProcessor{})
 	handler.ServeHTTP(w, req)
 
 	// Handler should process without error on parameter translation
@@ -130,7 +142,7 @@ func TestResponsesHandler_FallbackChainOnProviderUnavailable(t *testing.T) {
 		"messages": []map[string]string{
 			{"role": "user", "content": "hello"},
 		},
-		"model": "router:chat",
+		"model":      "router:chat",
 		"max_tokens": 1024,
 	}
 
@@ -139,7 +151,7 @@ func TestResponsesHandler_FallbackChainOnProviderUnavailable(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 
 	w := httptest.NewRecorder()
-	handler := NewResponsesHandler()
+	handler := NewResponsesHandler(&mockProcessor{})
 	handler.ServeHTTP(w, req)
 
 	// Fallback should be attempted (handler doesn't error immediately)
@@ -154,7 +166,7 @@ func TestResponsesHandler_ResponseNormalization(t *testing.T) {
 		"messages": []map[string]string{
 			{"role": "user", "content": "hello"},
 		},
-		"model": "gpt-3.5-turbo",
+		"model":      "gpt-3.5-turbo",
 		"max_tokens": 512,
 	}
 
@@ -163,7 +175,7 @@ func TestResponsesHandler_ResponseNormalization(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 
 	w := httptest.NewRecorder()
-	handler := NewResponsesHandler()
+	handler := NewResponsesHandler(&mockProcessor{})
 	handler.ServeHTTP(w, req)
 
 	// Response body should be valid JSON (or error message)
@@ -186,7 +198,7 @@ func TestResponsesHandler_ErrorHandling(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 
 	w := httptest.NewRecorder()
-	handler := NewResponsesHandler()
+	handler := NewResponsesHandler(&mockProcessor{})
 	handler.ServeHTTP(w, req)
 
 	// Should return error status
@@ -207,7 +219,7 @@ func TestResponsesHandler_ContentTypeValidation(t *testing.T) {
 		"messages": []map[string]string{
 			{"role": "user", "content": "hello"},
 		},
-		"model": "gpt-4",
+		"model":      "gpt-4",
 		"max_tokens": 1024,
 	}
 
@@ -216,7 +228,7 @@ func TestResponsesHandler_ContentTypeValidation(t *testing.T) {
 	req.Header.Set("Content-Type", "text/plain") // Wrong type
 
 	w := httptest.NewRecorder()
-	handler := NewResponsesHandler()
+	handler := NewResponsesHandler(&mockProcessor{})
 	handler.ServeHTTP(w, req)
 
 	// Should reject non-JSON content type or handle gracefully
@@ -231,9 +243,9 @@ func TestResponsesHandler_MetadataPreservation(t *testing.T) {
 		"messages": []map[string]string{
 			{"role": "user", "content": "hello"},
 		},
-		"model": "gpt-4",
+		"model":      "gpt-4",
 		"max_tokens": 1024,
-		"user_id": "test-user",
+		"user_id":    "test-user",
 		"request_id": "req-123",
 	}
 
@@ -243,7 +255,7 @@ func TestResponsesHandler_MetadataPreservation(t *testing.T) {
 	req.Header.Set("X-Request-ID", "req-123")
 
 	w := httptest.NewRecorder()
-	handler := NewResponsesHandler()
+	handler := NewResponsesHandler(&mockProcessor{})
 	handler.ServeHTTP(w, req)
 
 	// Metadata should be preserved in response headers or body

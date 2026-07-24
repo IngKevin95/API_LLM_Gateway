@@ -41,7 +41,7 @@ func (m *Middleware) Chat(ctx context.Context, req adapter.Request) (adapter.Res
 		PromptTokens:     promptTokens,
 		CompletionTokens: completionTokens,
 	}
-	
+
 	// Track the cost asynchronously or synchronously (Tracker handles it)
 	_ = m.tracker.Track(ctx, record)
 

@@ -77,7 +77,7 @@ func TestCapabilityInference_VisionFromImageBase64(t *testing.T) {
 				"role": "user",
 				"content": []interface{}{
 					map[string]interface{}{
-						"type": "image",
+						"type":  "image",
 						"image": "data:image/png;base64,iVBORw0KG...",
 					},
 				},
@@ -151,7 +151,7 @@ func TestCapabilityInference_TextOnlyIsChat(t *testing.T) {
 	req := map[string]interface{}{
 		"messages": []interface{}{
 			map[string]interface{}{
-				"role": "user",
+				"role":    "user",
 				"content": "just plain text",
 			},
 		},

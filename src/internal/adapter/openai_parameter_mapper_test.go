@@ -30,8 +30,8 @@ func TestOpenAIParameterMapper_ClampOutOfRangeParameters(t *testing.T) {
 	mapper := NewOpenAIParameterMapper()
 
 	params := map[string]interface{}{
-		"temperature": 5.0,   // out of range, should clamp to 2.0
-		"top_p":       1.5,   // out of range, should clamp to 1.0
+		"temperature": 5.0, // out of range, should clamp to 2.0
+		"top_p":       1.5, // out of range, should clamp to 1.0
 	}
 
 	mapped := mapper.MapParameters(params)
@@ -48,8 +48,8 @@ func TestOpenAIParameterMapper_HandleNegativeValues(t *testing.T) {
 	mapper := NewOpenAIParameterMapper()
 
 	params := map[string]interface{}{
-		"temperature": -1.0,   // clamp to 0.0
-		"top_p":       -0.5,   // clamp to 0.0
+		"temperature": -1.0, // clamp to 0.0
+		"top_p":       -0.5, // clamp to 0.0
 	}
 
 	mapped := mapper.MapParameters(params)
@@ -110,13 +110,13 @@ func TestOpenAIParameterMapper_PreservesValidParameters(t *testing.T) {
 	mapper := NewOpenAIParameterMapper()
 
 	params := map[string]interface{}{
-		"temperature":     0.7,
-		"top_p":           0.9,
-		"seed":            42,
-		"max_tokens":      512,
-		"tool_choice":     "auto",
-		"response_format": "json_object",
-		"presence_penalty": 0.0,
+		"temperature":       0.7,
+		"top_p":             0.9,
+		"seed":              42,
+		"max_tokens":        512,
+		"tool_choice":       "auto",
+		"response_format":   "json_object",
+		"presence_penalty":  0.0,
 		"frequency_penalty": 0.0,
 	}
 
@@ -182,13 +182,13 @@ func TestOpenAIParameterMapper_SeedValidation(t *testing.T) {
 	mapper := NewOpenAIParameterMapper()
 
 	tests := []struct {
-		seed      int
+		seed       int
 		shouldKeep bool
 	}{
 		{0, true},
 		{42, true},
 		{999999, true},
-		{-1, false},  // negative seeds not allowed
+		{-1, false}, // negative seeds not allowed
 	}
 
 	for _, tt := range tests {
