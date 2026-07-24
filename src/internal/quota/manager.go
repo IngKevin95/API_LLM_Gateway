@@ -3,6 +3,8 @@ package quota
 import (
 	"sync"
 	"time"
+
+	"api-llm-gateway/internal/adapter"
 )
 
 type Consumption struct {
@@ -14,18 +16,22 @@ type Manager interface {
 	Reserve(providerID string, estimate Consumption) bool
 	Commit(providerID string, estimate Consumption, actual Consumption) error
 	Remaining(providerID, model string) int
+	LearnFromHeaders(providerID, modelID string, quota adapter.QuotaInfo)
 }
 
 type providerState struct {
-	limit   Consumption
-	used    Consumption
-	window  string // "YYYY-MM-DD"
+	limit            Consumption
+	used             Consumption
+	window           string // "YYYY-MM-DD"
+	resetAt          *time.Time
+	learnedRemaining *int64 // nil = calculate from limit-used; otherwise use this value
 }
 
 type inMemoryManager struct {
-	mu     sync.RWMutex
-	states map[string]*providerState
-	clock  func() time.Time
+	mu        sync.RWMutex
+	states    map[string]*providerState
+	clock     func() time.Time
+	persister Persister // optional async persistence (HU-EVO-008)
 }
 
 func NewInMemoryManager() *inMemoryManager {
@@ -34,8 +40,17 @@ func NewInMemoryManager() *inMemoryManager {
 
 func NewInMemoryManagerWithClock(clock func() time.Time) *inMemoryManager {
 	return &inMemoryManager{
-		states: make(map[string]*providerState),
-		clock:  clock,
+		states:    make(map[string]*providerState),
+		clock:     clock,
+		persister: &NoPersister{}, // default: no persistence
+	}
+}
+
+func NewInMemoryManagerWithPersister(clock func() time.Time, persister Persister) *inMemoryManager {
+	return &inMemoryManager{
+		states:    make(map[string]*providerState),
+		clock:     clock,
+		persister: persister,
 	}
 }
 
@@ -151,15 +166,18 @@ func (m *inMemoryManager) Remaining(providerID, model string) int {
 
 	state, exists := m.states[providerID]
 	if !exists {
-		// If no limit is configured, we can assume infinite or 0. 
-		// The Router expects remaining > 0 to use it.
-		// Let's assume math.MaxInt32 if no limit.
 		return 999999999
 	}
-	
+
+	if state.learnedRemaining != nil {
+		if *state.learnedRemaining < 0 {
+			return 0
+		}
+		return int(*state.learnedRemaining)
+	}
+
 	window := currentWindow(m.clock())
 	if state.window != window {
-		// New window has full limit
 		return state.limit.Tokens
 	}
 
@@ -168,6 +186,56 @@ func (m *inMemoryManager) Remaining(providerID, model string) int {
 		return 0
 	}
 	return remaining
+}
+
+// LearnFromHeaders learns quota from provider response headers (HU-EVO-007)
+func (m *inMemoryManager) LearnFromHeaders(providerID, modelID string, quota adapter.QuotaInfo) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	state, exists := m.states[providerID]
+	if !exists {
+		state = &providerState{
+			window: currentWindow(m.clock()),
+		}
+		m.states[providerID] = state
+	}
+
+	// Detect reset: ResetAt changed from previous value
+	if quota.ResetAt != nil && state.resetAt != nil {
+		if quota.ResetAt.After(*state.resetAt) {
+			// Window reset detected: update limit from learned value
+			if quota.Limit > 0 {
+				state.limit = Consumption{Tokens: int(quota.Limit)}
+			}
+		}
+	}
+
+	// Update limit if learned value is provided and higher than current
+	if quota.Limit > int64(state.limit.Tokens) {
+		state.limit = Consumption{Tokens: int(quota.Limit)}
+	}
+
+	// Clamp remaining to 0 if negative
+	remaining := quota.Remaining
+	if remaining < 0 {
+		remaining = 0
+	}
+
+	// Learn remaining from header
+	state.learnedRemaining = &remaining
+	state.resetAt = quota.ResetAt
+
+	// Enqueue async persistence (HU-EVO-008)
+	if m.persister != nil {
+		go func() {
+			_ = m.persister.Enqueue(PersistJob{
+				ProviderID: providerID,
+				ModelID:    modelID,
+				Quota:      quota,
+			})
+		}()
+	}
 }
 
 func currentWindow(t time.Time) string {

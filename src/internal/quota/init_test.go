@@ -57,7 +57,7 @@ func TestInitFromRegistry_MissingHint_DefaultsTo1M(t *testing.T) {
 // precedencia sobre quota_hint del YAML; InitFromRegistry no lo pisa.
 func TestRestoreRemaining_TakesPrecedenceOverQuotaHint(t *testing.T) {
 	m := NewInMemoryManager()
-	m.RestoreRemaining("mistral", 500_000_000)     // restaurado desde PostgreSQL en boot
+	m.RestoreRemaining("mistral", 500_000_000)                    // restaurado desde PostgreSQL en boot
 	m.InitFromRegistry(map[string]*int{"mistral": intPtr(14400)}) // quota_hint del YAML, no debe pisar
 
 	if got := m.Remaining("mistral", ""); got != 500_000_000 {

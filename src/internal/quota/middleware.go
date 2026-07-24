@@ -53,6 +53,12 @@ func (m *Middleware) Chat(ctx context.Context, req adapter.Request) (adapter.Res
 		Requests: 1,
 	}
 	_ = m.manager.Commit(m.provider, estimate, actual)
+
+	// Learn quota from response headers (HU-EVO-006/007)
+	if resp.QuotaInfo.Limit > 0 || resp.QuotaInfo.Remaining > 0 {
+		m.manager.LearnFromHeaders(m.provider, req.Model, resp.QuotaInfo)
+	}
+
 	return resp, nil
 }
 

@@ -64,8 +64,8 @@ func (m *AnthropicParameterMapper) MapParameters(params map[string]interface{}) 
 			// Other standard parameters pass through
 			result[key] = value
 
-		// Unsupported OpenAI features are silently dropped:
-		// response_format, seed, presence_penalty, frequency_penalty, n, etc.
+			// Unsupported OpenAI features are silently dropped:
+			// response_format, seed, presence_penalty, frequency_penalty, n, etc.
 		}
 	}
 

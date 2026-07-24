@@ -51,7 +51,7 @@ func TestIntegration_QuotaFailover(t *testing.T) {
 	// Inject QuotaManager into the Router as well (so Router knows if global provider quota is exhausted).
 	// Currently quota manager's Remaining() just takes a key, which corresponds to the provider in this test.
 	type routerQuota struct{ qm quota.Manager }
-	
+
 	// Create router with StaticQuota for now, or adapt router interface if needed.
 	// Since EP-003 says QuotaManager is used by Router, we'll implement it.
 	rt := router.New(reg, router.StaticHealth{}, router.StaticQuota{}, tokenizer.NewHeuristic())
@@ -77,7 +77,7 @@ func TestIntegration_QuotaFailover(t *testing.T) {
 		Messages: []adapter.Message{{Role: "user", Content: "hola"}},
 	}
 	resp, err := eng.Complete(context.Background(), "chat", req)
-	
+
 	if err != nil {
 		t.Fatalf("Complete error inesperado: %v", err)
 	}
