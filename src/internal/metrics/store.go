@@ -9,13 +9,13 @@ import (
 
 // RequestMetric registra una métrica de request individual.
 type RequestMetric struct {
-	Provider   string
-	Model      string
-	LatencyMs  int64
-	Status     int
-	Tokens     int
-	Cost       float64
-	Timestamp  time.Time
+	Provider  string
+	Model     string
+	LatencyMs int64
+	Status    int
+	Tokens    int
+	Cost      float64
+	Timestamp time.Time
 }
 
 // InMemoryStore es un almacén de métricas en memoria con rolling window.

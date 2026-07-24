@@ -11,7 +11,7 @@ import (
 
 type allHealthy struct{ down map[string]bool }
 
-func (h allHealthy) Healthy(_ , model string) bool { return !h.down[model] }
+func (h allHealthy) Healthy(_, model string) bool { return !h.down[model] }
 
 type fixedQuota struct{ zero map[string]bool }
 

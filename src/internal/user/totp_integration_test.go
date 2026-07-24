@@ -33,7 +33,7 @@ func TestStore_MfaEnrollVerifyDisable(t *testing.T) {
 
 	// Como no tenemos un generador de tokens en el test para simular al usuario,
 	// usaremos la librería otp internamente para generar un token válido para el test.
-	
+
 	// Validar con un código incorrecto
 	err = s.MfaVerify(context.Background(), u.ID, "000000")
 	if err != ErrInvalidMfaCode {

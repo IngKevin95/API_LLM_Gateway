@@ -12,12 +12,12 @@ import (
 
 // Session representa una sesión activa de un usuario
 type Session struct {
-	ID        string
-	UserID    string
-	UserAgent string
-	IP        string
+	ID         string
+	UserID     string
+	UserAgent  string
+	IP         string
 	LastUsedAt time.Time
-	CreatedAt time.Time
+	CreatedAt  time.Time
 }
 
 // SessionStore gestiona la persistencia de las sesiones

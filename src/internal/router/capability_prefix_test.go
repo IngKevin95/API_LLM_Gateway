@@ -166,7 +166,7 @@ func TestRouter_IsCapabilityPrefix(t *testing.T) {
 		{"router:embedding", true},
 		{"gpt-4", false},
 		{"claude-opus", false},
-		{"router:", true},  // technically valid, just empty capability
+		{"router:", true}, // technically valid, just empty capability
 	}
 
 	for _, tt := range tests {

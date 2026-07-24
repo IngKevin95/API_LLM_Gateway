@@ -89,8 +89,8 @@ func TestNormalizer_ConvertResponsesAPIRequest(t *testing.T) {
 
 func TestNormalizer_PreservesAllParameters(t *testing.T) {
 	req := map[string]interface{}{
-		"model": "gpt-4",
-		"messages": []interface{}{},
+		"model":        "gpt-4",
+		"messages":     []interface{}{},
 		"temperature":  0.8,
 		"top_p":        0.95,
 		"seed":         42,

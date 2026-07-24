@@ -20,12 +20,12 @@ func TestCostTracker_RecordsCost_WithAttribution(t *testing.T) {
 
 	// Cuando: se registra una petición completada
 	err := tracker.RecordCost(cost.CostRecord{
-		AgentID:       agentID,
-		ProviderID:    providerID,
-		ModelID:       modelID,
-		InputTokens:   int64(inputTokens),
-		OutputTokens:  int64(outputTokens),
-		CostPerToken:  costPerToken,
+		AgentID:      agentID,
+		ProviderID:   providerID,
+		ModelID:      modelID,
+		InputTokens:  int64(inputTokens),
+		OutputTokens: int64(outputTokens),
+		CostPerToken: costPerToken,
 	})
 
 	// Entonces: se registra costo atribuido correctamente
@@ -51,12 +51,12 @@ func TestCostTracker_MissingTariff_RecordsAsUnknown(t *testing.T) {
 
 	// Dado: modelo sin cost_per_token
 	err := tracker.RecordCost(cost.CostRecord{
-		AgentID:       "claude-code",
-		ProviderID:    "openai",
-		ModelID:       "gpt-4o",
-		InputTokens:   1000,
-		OutputTokens:  500,
-		CostPerToken:  0, // Tarifa desconocida
+		AgentID:      "claude-code",
+		ProviderID:   "openai",
+		ModelID:      "gpt-4o",
+		InputTokens:  1000,
+		OutputTokens: 500,
+		CostPerToken: 0, // Tarifa desconocida
 	})
 
 	// Entonces: se registra sin error (aunque costo es 0)
@@ -80,12 +80,12 @@ func TestCostTracker_FreeModel_RegistersZeroCost(t *testing.T) {
 
 	// Dado: modelo con costo 0
 	err := tracker.RecordCost(cost.CostRecord{
-		AgentID:       "claude-code",
-		ProviderID:    "openai",
-		ModelID:       "gpt-3.5-turbo", // gratuito (en test)
-		InputTokens:   1000,
-		OutputTokens:  500,
-		CostPerToken:  0, // gratuito
+		AgentID:      "claude-code",
+		ProviderID:   "openai",
+		ModelID:      "gpt-3.5-turbo", // gratuito (en test)
+		InputTokens:  1000,
+		OutputTokens: 500,
+		CostPerToken: 0, // gratuito
 	})
 
 	// Entonces: se registra con costo 0
@@ -110,12 +110,12 @@ func TestCostTracker_Failover_AttributesToCorrectProvider(t *testing.T) {
 	// Provider 2 falló (no registra)
 	// Provider 3 respondió
 	err := tracker.RecordCost(cost.CostRecord{
-		AgentID:       agentID,
-		ProviderID:    "openrouter", // El que efectivamente respondió
-		ModelID:       "gpt-4o",
-		InputTokens:   1000,
-		OutputTokens:  500,
-		CostPerToken:  0.00003,
+		AgentID:      agentID,
+		ProviderID:   "openrouter", // El que efectivamente respondió
+		ModelID:      "gpt-4o",
+		InputTokens:  1000,
+		OutputTokens: 500,
+		CostPerToken: 0.00003,
 	})
 
 	// Entonces: costo atribuido solo a openrouter
@@ -136,12 +136,12 @@ func TestCostTracker_StreamAborted_RecordsPartialTokens(t *testing.T) {
 	// Dado: stream abortado a mitad
 	// Cliente envía N tokens, pero solo recibe M antes de abortar
 	err := tracker.RecordCost(cost.CostRecord{
-		AgentID:       "claude-code",
-		ProviderID:    "openai",
-		ModelID:       "gpt-4o",
-		InputTokens:   1000,
-		OutputTokens:  250, // Partial — solo 250 de los posibles 500 tokens se enviaron
-		CostPerToken:  0.00003,
+		AgentID:      "claude-code",
+		ProviderID:   "openai",
+		ModelID:      "gpt-4o",
+		InputTokens:  1000,
+		OutputTokens: 250, // Partial — solo 250 de los posibles 500 tokens se enviaron
+		CostPerToken: 0.00003,
 	})
 
 	// Entonces: se registra el costo exacto de los tokens parciales

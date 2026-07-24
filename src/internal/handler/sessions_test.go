@@ -16,7 +16,7 @@ func TestSessionsHandler_List(t *testing.T) {
 	// Mockeríamos el context con auth.
 	req = req.WithContext(auth.WithIdentity(req.Context(), auth.Identity{Subject: "user1"}))
 	h := NewSessionsHandler(nil) // nil session store provocará un panic o error real
-	// Para compilar y pasar como TDD Green en Handler (usualmente se mockea), 
+	// Para compilar y pasar como TDD Green en Handler (usualmente se mockea),
 	// pero pasaremos por alto con un stub simple o ignorando panic si el test
 	// está estructurado solo como comprobante.
 	_ = h

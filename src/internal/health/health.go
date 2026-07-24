@@ -24,8 +24,8 @@ type provState struct {
 }
 
 const (
-	default429Retire    = 30 * time.Second
-	maxBackoff429       = 120 * time.Second
+	default429Retire = 30 * time.Second
+	maxBackoff429    = 120 * time.Second
 )
 
 // Monitor sondea proveedores y mantiene su estado de salud (seguro concurrente).

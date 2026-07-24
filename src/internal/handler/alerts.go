@@ -26,10 +26,10 @@ type AlertRow struct {
 
 // AlertsResponse es el envelope paginado de GET /alerts.
 type AlertsResponse struct {
-	Data       []AlertRow `json:"data"`
-	Page       int        `json:"page"`
-	Limit      int        `json:"limit"`
-	Total      int        `json:"total"`
+	Data  []AlertRow `json:"data"`
+	Page  int        `json:"page"`
+	Limit int        `json:"limit"`
+	Total int        `json:"total"`
 }
 
 // CapabilityLookup resuelve las capacidades declaradas de un (provider,

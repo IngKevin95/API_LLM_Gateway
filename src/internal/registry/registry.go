@@ -25,13 +25,13 @@ var envRef = regexp.MustCompile(`^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$`)
 
 // Model es un modelo concreto de un provider con sus atributos de score.
 type Model struct {
-	Name            string   `yaml:"name"`
-	Capabilities    []string `yaml:"capabilities"`
-	QualityScore    int      `yaml:"quality_score"`
-	LatencyP50ms    int      `yaml:"latency_p50_ms"`
-	CostPer1M       int      `yaml:"cost_per_1m_tokens"`
-	MaxContextToks  int      `yaml:"max_context_tokens"`
-	Disabled        bool     `yaml:"disabled"`
+	Name           string   `yaml:"name"`
+	Capabilities   []string `yaml:"capabilities"`
+	QualityScore   int      `yaml:"quality_score"`
+	LatencyP50ms   int      `yaml:"latency_p50_ms"`
+	CostPer1M      int      `yaml:"cost_per_1m_tokens"`
+	MaxContextToks int      `yaml:"max_context_tokens"`
+	Disabled       bool     `yaml:"disabled"`
 
 	// Provider al que pertenece (rellenado en Load).
 	ProviderID string `yaml:"-"`

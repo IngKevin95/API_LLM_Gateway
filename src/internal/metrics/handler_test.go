@@ -47,9 +47,9 @@ func (m *mockStore) GetGatewayMetrics(ctx context.Context) (*metrics.GatewayMetr
 		},
 		Providers: []metrics.ProviderStatus{},
 		Latency: metrics.LatencyMetrics{
-			P50Ms:  100.0,
-			P95Ms:  200.0,
-			P99Ms:  300.0,
+			P50Ms: 100.0,
+			P95Ms: 200.0,
+			P99Ms: 300.0,
 		},
 		Models: m.data,
 	}, nil
