@@ -5,16 +5,16 @@ export default function Providers({ metrics }) {
     <section data-testid="providers-tab" aria-label="Providers">
       <div className="provider-grid">
         {providers.map((p) => (
-          <div className="provider-card" key={p.provider}>
+          <div className="provider-card" key={p.name}>
             <header>
-              <span className="provider-name">{p.provider}</span>
-              <span className={`badge ${p.healthy ? 'badge-green' : 'badge-red'}`}>
-                {p.healthy ? 'healthy' : 'unhealthy'}
+              <span className="provider-name">{p.name}</span>
+              <span className={`badge ${p.available ? 'badge-green' : 'badge-red'}`}>
+                {p.available ? 'healthy' : 'unhealthy'}
               </span>
             </header>
             <div className="provider-body mono">
-              <div>last response: {p.last_response_at ?? '—'}</div>
-              <div>circuit breaker: {p.circuit_breaker ?? 'unknown'}</div>
+              <div>last response: {p.last_success || '—'}</div>
+              <div>circuit breaker: {p.circuit_breaker_open ? 'open' : 'closed'}</div>
             </div>
           </div>
         ))}

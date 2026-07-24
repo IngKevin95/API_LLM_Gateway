@@ -4,6 +4,7 @@ export default function Overview({ metrics }) {
   }
 
   const latency = metrics.latency || {};
+  const requests = metrics.requests || {};
 
   return (
     <section data-testid="overview-tab" aria-label="Overview">
@@ -14,23 +15,23 @@ export default function Overview({ metrics }) {
         </div>
         <div className="stat-card">
           <span className="stat-label">Total Requests</span>
-          <span className="stat-value mono">{metrics.total_requests ?? 0}</span>
+          <span className="stat-value mono">{requests.total ?? 0}</span>
         </div>
         <div className="stat-card">
           <span className="stat-label">Errors</span>
-          <span className="stat-value mono">{metrics.errors ?? 0}</span>
+          <span className="stat-value mono">{requests.errors ?? 0}</span>
         </div>
         <div className="stat-card">
           <span className="stat-label">Latency p50</span>
-          <span className="stat-value mono">{latency.p50 ?? 0}ms</span>
+          <span className="stat-value mono">{latency.p50_ms ?? 0}ms</span>
         </div>
         <div className="stat-card">
           <span className="stat-label">Latency p95</span>
-          <span className="stat-value mono">{latency.p95 ?? 0}ms</span>
+          <span className="stat-value mono">{latency.p95_ms ?? 0}ms</span>
         </div>
         <div className="stat-card">
           <span className="stat-label">Latency p99</span>
-          <span className="stat-value mono">{latency.p99 ?? 0}ms</span>
+          <span className="stat-value mono">{latency.p99_ms ?? 0}ms</span>
         </div>
       </div>
     </section>

@@ -10,8 +10,8 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/metrics': 'http://localhost:8080',
-      '/alerts': 'http://localhost:8080',
+      '/metrics': process.env.GATEWAY_PROXY_TARGET || 'http://localhost:8080',
+      '/alerts': process.env.GATEWAY_PROXY_TARGET || 'http://localhost:8080',
     },
   },
   build: {

@@ -4,13 +4,12 @@ import Dashboard from '../Dashboard';
 
 const metricsPayload = {
   uptime_seconds: 36000,
-  total_requests: 120,
-  errors: 2,
-  latency: { p50: 80, p95: 200, p99: 400 },
+  requests: { total: 120, by_handler: {}, errors: 2 },
+  latency: { p50_ms: 80, p95_ms: 200, p99_ms: 400 },
   quota: [
     { provider: 'groq', model: 'mixtral', limit: 1000, remaining: 900, reset_at: null, healthy: true },
   ],
-  providers: [{ provider: 'groq', healthy: true, last_response_at: null, circuit_breaker: 'closed' }],
+  providers: [{ name: 'groq', available: true, last_success: '', circuit_breaker_open: false }],
 };
 
 const alertsPayload = {
