@@ -82,9 +82,32 @@ func main() {
 			log.Fatalf("registry: GATEWAY_FREETIER_CONFIG=%s no encontrado: %v", freeTierPath, statErr)
 		}
 
-		// HU-EVO-005: Quota Manager inicializado desde los quota_hint del Registry
-		// (incluye los proveedores free-tier recién mergeados).
+		// HU-EVO-008: Persister real a PostgreSQL, opt-in vía
+		// GATEWAY_QUOTA_POSTGRES_DSN. Si no está declarado, sigue usando
+		// NoPersister (no-op) — comportamiento sin cambios. Si está declarado
+		// pero la conexión falla, se loguea warning y se sigue solo con
+		// memoria (AC3: la persistencia nunca debe tumbar el boot).
 		qm := quota.NewInMemoryManager()
+		if dsn := os.Getenv("GATEWAY_QUOTA_POSTGRES_DSN"); dsn != "" {
+			pgPersister, err := quota.NewPostgresPersister(dsn, 1000)
+			if err != nil {
+				log.Printf("WARN gateway: quota postgres persister no disponible, sigue solo en RAM: %v", err)
+			} else {
+				qm = quota.NewInMemoryManagerWithPersister(time.Now, pgPersister)
+				if restored, err := pgPersister.LoadRemaining(context.Background()); err != nil {
+					log.Printf("WARN gateway: quota postgres LoadRemaining falló, arranca sin restaurar: %v", err)
+				} else {
+					for providerID, remaining := range restored {
+						qm.RestoreRemaining(providerID, int(remaining)) // AC5: precedencia sobre quota_hint
+					}
+					log.Printf("INFO gateway: quota restaurada desde PostgreSQL para %d proveedor(es)", len(restored))
+				}
+			}
+		}
+
+		// HU-EVO-005: Quota Manager inicializado desde los quota_hint del Registry
+		// (incluye los proveedores free-tier recién mergeados). InitFromRegistry
+		// no pisa estado ya restaurado desde el persister (AC5).
 		qm.InitFromRegistry(reg.QuotaHints())
 
 		// HU-EVO-004: Health Monitor real; RetireOn429 lo invoca el Failover al
