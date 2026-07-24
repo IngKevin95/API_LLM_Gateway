@@ -134,7 +134,86 @@ Ampliar `/metrics` para exponer desglose de cuota por proveedor y modelo (desde 
 
 Implementado en `openspec/changes/metrics-quota-alertas-rbac` (rama
 `feature/ep-evo-003-ss1-metrics-alertas-rbac`). SS2 (HU-EVO-014/015, UI React)
-queda pendiente de su propio change.
+implementado en `feature/ep-evo-003-ss2-ui-react-dashboard`. HU-EVO-016
+(toggle claro/oscuro) extiende el mismo Dashboard.jsx de SS2, sin backend
+nuevo.
+
+---
+
+## EP-EVO-004 · Gestión de Usuarios, Roles y Seguridad de Cuenta
+
+| Campo | Valor |
+|---|---|
+| **Tipo** | evolutivo |
+| **Extiende** | EP-004A (Seguridad), HU-009 (RBAC), EP-EVO-003 (Dashboard React) |
+| **Impacta** | `internal/auth/apikey` (hoy in-memory, seedeado por env var, sin CRUD) |
+| **Objetivo(s) del PRD cubiertos** | Obj. 4 (Seguridad empresarial) |
+| **Riesgo** | alto (toca autenticación, sesiones, secretos — requiere `security-reviewer` antes de release) |
+| **Métrica de éxito** | Un admin puede invitar/suspender miembros del equipo con rol y scopes desde el dashboard; cada usuario puede rotar su propia API key, activar 2FA y cerrar sesiones activas sin intervención manual en la base de datos |
+
+### Descripción
+
+Reemplaza el `apikey.Store` in-memory sembrado por `GATEWAY_API_KEYS` (env var, sin
+persistencia, sin gestión desde UI) por un store persistente en PostgreSQL con
+CRUD real de usuarios, roles (`admin`/`operator`/`viewer`), scopes/tenants
+asignados, y las pantallas "Team & Roles" y "Profile & Security" del dashboard
+React (HU-EVO-014).
+
+**Por qué existe:** hoy la única forma de dar de alta un usuario es editar la
+variable de entorno `GATEWAY_API_KEYS` y redeployar — no hay UI, no hay
+revocación individual, no hay sesiones, no hay 2FA. A medida que el Gateway
+suma operadores reales esto se vuelve un cuello de botella operativo y un
+riesgo de seguridad (keys que nunca se rotan).
+
+**Approach:**
+1. Store de usuarios persistente en PostgreSQL (tabla `users`, hash de
+   password con bcrypt/argon2, nunca texto plano — mismo criterio que
+   `apikey.Store` de no loguear secretos).
+2. CRUD de usuarios + roles vía endpoints REST protegidos (solo `admin`
+   puede invitar/suspender/cambiar rol).
+3. Gestión de API keys por usuario: generar, listar (prefijo enmascarado),
+   revocar — reemplaza el seed manual por `GATEWAY_API_KEYS`.
+4. Sesiones: listar sesiones activas por dispositivo/IP aproximada, cerrar
+   sesión individual o todas.
+5. 2FA/MFA: TOTP estándar (compatible con Google Authenticator/Authy),
+   opcional por usuario.
+6. UI: pantallas "Team & Roles" y "Profile & Security" del Dashboard React
+   (HU-EVO-014), consumiendo los endpoints anteriores.
+
+### Capabilities
+
+- `POST /users` (invitar), `PATCH /users/:id` (rol/scopes/estado), `DELETE /users/:id` (suspender) — solo admin
+- `GET /users` — lista filtrada por tenant si no es admin global
+- `POST /users/:id/api-keys` (generar), `DELETE /users/:id/api-keys/:keyId` (revocar)
+- `GET /sessions`, `DELETE /sessions/:id` — sesiones activas del usuario autenticado
+- `POST /auth/mfa/enroll`, `POST /auth/mfa/verify` — alta y verificación de TOTP
+- UI React: pantallas "Team & Roles" (tabla de usuarios, invitar, badges de rol/estado) y "Profile & Security" (API keys, 2FA, sesiones, preferencias de notificación)
+
+### Historias anticipadas
+
+- **HU-EVO-017** — Store de usuarios persistente en PostgreSQL + CRUD admin (`users` table, roles, scopes)
+- **HU-EVO-018** — Gestión de API keys por usuario (generar/listar enmascarada/revocar), reemplaza seed por env var
+- **HU-EVO-019** — Sesiones activas: listar y cerrar (individual/todas)
+- **HU-EVO-020** — 2FA/TOTP opcional por usuario
+- **HU-EVO-021** — UI React "Team & Roles" (consume HU-EVO-017)
+- **HU-EVO-022** — UI React "Profile & Security" (consume HU-EVO-018/019/020)
+
+### Fuente de diseño
+
+Stitch project `12981760791975432480` ("API LLM Gateway - Dashboard de
+Métricas"), design system "Gateway Ops Dark": pantallas
+`screens/29f991058b5b4db7876c6d11ef699810` (Team & Roles) y
+`screens/67a1f823cd9c4b97828785f4e37b5bbc` (Profile & Security).
+
+### Nota de secuenciación
+
+Por la regla del arnés "primero cimientos, después negocio, en trozos
+chicos" (CLAUDE.md), esta épica toca autenticación — capa fundacional — y
+excede el umbral de 3 HU. Se construye en sub-slices: primero el store de
+usuarios + API keys (HU-EVO-017/018, sin UI), después sesiones + 2FA
+(HU-EVO-019/020, sin UI), y por último las dos pantallas (HU-EVO-021/022)
+una vez los endpoints existen y están probados. `security-reviewer` corre
+sobre esta épica antes de cualquier release que la incluya.
 
 ---
 
