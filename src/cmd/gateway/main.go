@@ -5,13 +5,18 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
+
+	_ "github.com/lib/pq"
 
 	"api-llm-gateway/internal/adapter"
 	adapteraihubmix "api-llm-gateway/internal/adapter/aihubmix"
@@ -21,9 +26,13 @@ import (
 	adapteromniroute "api-llm-gateway/internal/adapter/omniroute"
 	adapteropenai "api-llm-gateway/internal/adapter/openai"
 	adaptergeneric "api-llm-gateway/internal/adapter/generic"
+	"api-llm-gateway/internal/alert"
 	apianthropic "api-llm-gateway/internal/api/anthropic"
 	apiopenai "api-llm-gateway/internal/api/openai"
+	"api-llm-gateway/internal/auth"
+	"api-llm-gateway/internal/auth/apikey"
 	"api-llm-gateway/internal/failover"
+	"api-llm-gateway/internal/handler"
 	"api-llm-gateway/internal/health"
 	"api-llm-gateway/internal/metrics"
 	"api-llm-gateway/internal/middleware"
@@ -56,6 +65,8 @@ func main() {
 	metricsStore := metrics.NewInMemoryStore(10000)
 
 	var processor *GatewayProcessor
+	var alertDB *sql.DB
+	var metricsHandlerCapabilityLookup func(provider, model string) []string
 	if cfgPath != "" {
 		var err error
 		reg, err := registry.Load(cfgPath, nil)
@@ -133,12 +144,50 @@ func main() {
 		// Create Processor that uses Failover and metrics
 		processor = NewGatewayProcessor(fe, metricsStore)
 
-		// Snapshot inicial de quota/proveedores para /metrics, visible sin tráfico previo.
-		quotaSnapshot := make(map[string]int, len(providerIDs))
-		for _, id := range providerIDs {
-			quotaSnapshot[id] = qm.Remaining(id, "")
+		// Lista de proveedores configurados para /metrics, visible sin tráfico previo.
+		metricsStore.SetProviderSnapshot(providerIDs)
+
+		// HU-EVO-011: Quota Manager real como fuente en vivo del bloque
+		// "quota" de /metrics (leído por request, sin cache -- ver design.md).
+		metricsStore.SetQuotaSource(quotaSourceAdapter{qm: qm})
+		capabilityLookup := buildCapabilityLookup(reg)
+		metricsHandlerCapabilityLookup = capabilityLookup
+
+		// HU-EVO-012: Alert Manager, opt-in vía la misma PostgreSQL de cuota
+		// (GATEWAY_QUOTA_POSTGRES_DSN). Fail-soft: sin DSN, no arranca el
+		// worker (WARN, no bloquea boot) y /alerts responde lista vacía.
+		if dsn := os.Getenv("GATEWAY_QUOTA_POSTGRES_DSN"); dsn != "" {
+			if adb, err := sql.Open("postgres", dsn); err != nil {
+				log.Printf("WARN gateway: alert manager sin DB (sql.Open): %v", err)
+			} else if err := adb.PingContext(context.Background()); err != nil {
+				log.Printf("WARN gateway: alert manager sin DB (ping): %v", err)
+				_ = adb.Close()
+			} else {
+				threshold := alert.DefaultThreshold
+				if raw := os.Getenv("GATEWAY_ALERT_THRESHOLD"); raw != "" {
+					if v, err := strconv.ParseFloat(raw, 64); err == nil && v > 0 {
+						threshold = v
+					}
+				}
+				am, err := alert.NewManager(adb, alertQuotaAdapter{qm: qm}, threshold)
+				if err != nil {
+					log.Printf("WARN gateway: alert manager migración falló, worker deshabilitado: %v", err)
+					_ = adb.Close()
+				} else {
+					alertDB = adb
+					interval := time.Minute
+					if raw := os.Getenv("GATEWAY_ALERT_INTERVAL"); raw != "" {
+						if d, err := time.ParseDuration(raw); err == nil && d > 0 {
+							interval = d
+						}
+					}
+					go am.Run(context.Background(), interval)
+					log.Printf("INFO gateway: alert manager arrancado (threshold=%.2f, interval=%s)", threshold, interval)
+				}
+			}
+		} else {
+			log.Printf("WARN gateway: GATEWAY_QUOTA_POSTGRES_DSN no configurado, alert manager deshabilitado (/alerts responde vacío)")
 		}
-		metricsStore.SetProviderSnapshot(providerIDs, quotaSnapshot)
 	} else {
 		log.Printf("WARN gateway: sin config.yaml, arrancando en modo scaffold (solo /health)")
 	}
@@ -149,15 +198,43 @@ func main() {
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	// HU-060: /metrics endpoint con datos reales en memoria
+	// apiKeyStore resuelve identidades no-admin (HU-EVO-013, y HU-EVO-011 AC5
+	// para /metrics), seedeadas vía GATEWAY_API_KEYS. Compartido entre
+	// /metrics y /alerts: mismas credenciales, mismo mecanismo de scope.
+	apiKeyStore := apikey.NewStore()
+	loadAPIKeysFromEnv(apiKeyStore)
+
+	// HU-060: /metrics endpoint con datos reales en memoria. Admin (token
+	// estático GATEWAY_ADMIN_TOKEN) ve todo sin filtrar; una identidad de
+	// apiKeyStore (no-admin) ve el bloque quota filtrado por scope (AC5).
+	// Sin admin y sin key válida: 401.
 	metricsHandler := metrics.NewHandler(metricsStore)
+	if metricsHandlerCapabilityLookup != nil {
+		metricsHandler.SetCapabilityLookup(metricsHandlerCapabilityLookup)
+	}
+	metricsAuthenticated := apikey.Middleware(apiKeyStore)(metricsHandler)
 	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
 		adminToken := os.Getenv("GATEWAY_ADMIN_TOKEN")
-		if adminToken == "" || r.Header.Get("Authorization") != "Bearer "+adminToken {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+		if adminToken != "" && r.Header.Get("Authorization") == "Bearer "+adminToken {
+			metricsHandler.ServeHTTP(w, r)
 			return
 		}
-		metricsHandler.ServeHTTP(w, r)
+		metricsAuthenticated.ServeHTTP(w, r)
+	})
+
+	// HU-EVO-013: GET /alerts, RBAC-aware. Admin (mismo token estático que
+	// /metrics) ve todas las alertas sin filtro; cualquier otra identidad
+	// resuelta por apikey.Middleware (mismo apiKeyStore) solo ve alertas de
+	// modelos cubiertos por sus scopes. Sin identidad y sin admin: 401.
+	alertsHandler := handler.NewAlertsHandler(alertDB, handler.CapabilityLookup(metricsHandlerCapabilityLookup))
+	alertsAuthenticated := apikey.Middleware(apiKeyStore)(alertsHandler)
+	mux.HandleFunc("/alerts", func(w http.ResponseWriter, r *http.Request) {
+		adminToken := os.Getenv("GATEWAY_ADMIN_TOKEN")
+		if adminToken != "" && r.Header.Get("Authorization") == "Bearer "+adminToken {
+			alertsHandler.ServeHTTP(w, r.WithContext(handler.WithAdmin(r.Context())))
+			return
+		}
+		alertsAuthenticated.ServeHTTP(w, r)
 	})
 
 	// Register OpenAI-compatible endpoints (HU-012a, HU-012b, HU-012c)
@@ -226,6 +303,104 @@ func main() {
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Printf("shutdown: %v", err)
+	}
+}
+
+// quotaSourceAdapter adapta quota.Manager.Snapshot() ([]quota.Snapshot) al
+// metrics.QuotaSource ([]metrics.QuotaEntry) que espera metrics.Store, sin
+// que el paquete metrics dependa directamente del paquete quota
+// (HU-EVO-011).
+type quotaSourceAdapter struct {
+	qm quota.Manager
+}
+
+func (a quotaSourceAdapter) Snapshot() []metrics.QuotaEntry {
+	snap := a.qm.Snapshot()
+	out := make([]metrics.QuotaEntry, 0, len(snap))
+	for _, s := range snap {
+		out = append(out, metrics.QuotaEntry{
+			Provider:  s.Provider,
+			Model:     s.Model,
+			Limit:     s.Limit,
+			Remaining: s.Remaining,
+			ResetAt:   s.ResetAt,
+			Healthy:   s.Healthy,
+			LearnedAt: s.LearnedAt,
+		})
+	}
+	return out
+}
+
+// alertQuotaAdapter adapta quota.Manager.Snapshot() al alert.QuotaSnapshotter
+// que espera alert.Manager (mismo patrón que quotaSourceAdapter para metrics).
+type alertQuotaAdapter struct {
+	qm quota.Manager
+}
+
+func (a alertQuotaAdapter) Snapshot() []alert.QuotaEntry {
+	snap := a.qm.Snapshot()
+	out := make([]alert.QuotaEntry, 0, len(snap))
+	for _, s := range snap {
+		out = append(out, alert.QuotaEntry{
+			Provider:  s.Provider,
+			Model:     s.Model,
+			Limit:     s.Limit,
+			Remaining: s.Remaining,
+		})
+	}
+	return out
+}
+
+// buildCapabilityLookup resuelve las capacidades declaradas de un (provider,
+// model) desde el Registry, usado para filtrar /metrics#quota (HU-EVO-011
+// AC5) y /alerts (HU-EVO-013 AC4) por scope del requester. model=="" (fila
+// agregada sin desglose, ver quota.Snapshot) devuelve la unión de
+// capacidades de todos los modelos de ese proveedor.
+func buildCapabilityLookup(reg *registry.Registry) func(provider, model string) []string {
+	return func(provider, model string) []string {
+		var caps []string
+		for _, p := range reg.Providers() {
+			if p.ID != provider {
+				continue
+			}
+			for _, m := range p.Models {
+				if model == "" || m.Name == model {
+					caps = append(caps, m.Capabilities...)
+				}
+			}
+		}
+		return caps
+	}
+}
+
+// loadAPIKeysFromEnv seedea el apikey.Store desde GATEWAY_API_KEYS
+// (formato "key:tenant:cap1,cap2;key2:tenant2:cap1"), usado por /alerts para
+// resolver identidades no-admin (HU-EVO-013). Sin la env var, el store queda
+// vacío y todo acceso no-admin a /alerts devuelve 401 (fail-closed).
+func loadAPIKeysFromEnv(store *apikey.Store) {
+	raw := os.Getenv("GATEWAY_API_KEYS")
+	if raw == "" {
+		return
+	}
+	for _, entry := range strings.Split(raw, ";") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		parts := strings.SplitN(entry, ":", 3)
+		if len(parts) != 3 {
+			log.Printf("WARN gateway: GATEWAY_API_KEYS entrada inválida (esperado key:tenant:scopes), omitiendo")
+			continue
+		}
+		key, tenant, scopesRaw := parts[0], parts[1], parts[2]
+		var scopes []string
+		for _, s := range strings.Split(scopesRaw, ",") {
+			s = strings.TrimSpace(s)
+			if s != "" {
+				scopes = append(scopes, "capability:"+s)
+			}
+		}
+		store.Add(key, auth.Identity{Subject: tenant, Tenant: tenant, Scopes: scopes})
 	}
 }
 
