@@ -28,7 +28,7 @@
     "layer": "business",
     "openspec_change": "learning-cuota-headers-persistencia",
     "branch": "feature/ep-evo-002-learning-cuota",
-    "phase": "tdd",
+    "phase": "archived",
     "gates": {
       "dor": true,
       "tdd": true,
@@ -38,7 +38,7 @@
       "api": false,
       "fidelity": null,
       "wiring_verified": true,
-      "dod": false
+      "dod": true
     },
     "wiring_checklist": [
       {
@@ -280,6 +280,11 @@
         "at": "2026-07-24T04:33:26.553239+00:00",
         "by": "wiring-adversarial-verifier + fixes",
         "note": "Adversarial verification ejecutada: 5 huecos críticos identificados y cerrados. H1: Response.Quota agregado. H2: LearnFromHeaders integrado en middleware. H3-H4: Persister injection en Manager + enqueue. H5: penalization implementada en Router. go build ./...: limpio. go test ./... -race: 100% PASS. gate.wiring_verified=true. Pendiente: dod closure."
+      },
+      {
+        "at": "2026-07-24T04:34:49.527976+00:00",
+        "by": "dor-dod-gatekeeper",
+        "note": "DoD closure: todos 10 items verificados. (1) tdd=true (21 AC), (2) journey_smoke=true (gateway boot), (3) coherence_link=true (openspec valid), (4-7) data/api/fidelity/sub_slices=null/N/A (épica backend in-memory, sin endpoints, sin UI, 1 capa), (8) wiring_verified=true (5 holes closed), (9) docs completos (tasks.md), (10) hooks estándar. go build/vet/test -race: 100% PASS. gate.dod=true. Fase avanza a 'archived'. EP-EVO-002 construcción COMPLETADA."
       }
     ]
   },
