@@ -69,14 +69,20 @@ func TestSessionStore_RevokeOthers(t *testing.T) {
 	db := startTestPostgres(t)
 	defer db.Close()
 
-	us, _ := NewStore(db)
-	ss, _ := NewSessionStore(db, us)
+	us, err := NewStore(db)
+	if err != nil {
+		t.Fatalf("NewStore error: %v", err)
+	}
+	ss, err := NewSessionStore(db, us)
+	if err != nil {
+		t.Fatalf("NewSessionStore error: %v", err)
+	}
 
 	u, _ := us.Create(context.Background(), "session2@example.com", RoleOperator, "t1", nil)
 
-	s1, _ := ss.Create(context.Background(), u.ID, "UA1", "IP1")
+	_, _ = ss.Create(context.Background(), u.ID, "UA1", "IP1")
 	s2, _ := ss.Create(context.Background(), u.ID, "UA2", "IP2")
-	s3, _ := ss.Create(context.Background(), u.ID, "UA3", "IP3")
+	_, _ = ss.Create(context.Background(), u.ID, "UA3", "IP3")
 
 	// Revocar todas excepto s2
 	if err := ss.RevokeOthers(context.Background(), u.ID, s2); err != nil {

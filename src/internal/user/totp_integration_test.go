@@ -6,6 +6,9 @@ package user
 import (
 	"context"
 	"testing"
+	"time"
+
+	"github.com/pquerna/otp/totp"
 )
 
 func TestStore_MfaEnrollVerifyDisable(t *testing.T) {
@@ -30,7 +33,6 @@ func TestStore_MfaEnrollVerifyDisable(t *testing.T) {
 
 	// Como no tenemos un generador de tokens en el test para simular al usuario,
 	// usaremos la librería otp internamente para generar un token válido para el test.
-	// Nota: El test fallará hasta que se implemente y se añada la librería otp en el verde.
 	
 	// Validar con un código incorrecto
 	err = s.MfaVerify(context.Background(), u.ID, "000000")
@@ -38,9 +40,12 @@ func TestStore_MfaEnrollVerifyDisable(t *testing.T) {
 		t.Fatalf("se esperaba ErrInvalidMfaCode, se obtuvo %v", err)
 	}
 
-	// Aquí deberíamos generar un código válido y verificarlo,
-	// pero por ahora el test está en rojo y ni siquiera compila porque
-	// los métodos no existen en Store.
+	// Generar un código válido para el instante actual
+	validCode, _ := totp.GenerateCode(secret, time.Now())
+	err = s.MfaVerify(context.Background(), u.ID, validCode)
+	if err != nil {
+		t.Fatalf("MfaVerify falló con código válido: %v", err)
+	}
 
 	// Disable
 	err = s.MfaDisable(context.Background(), u.ID)

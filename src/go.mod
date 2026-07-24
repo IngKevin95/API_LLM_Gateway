@@ -7,4 +7,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-require github.com/lib/pq v1.12.3 // indirect
+require (
+	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
+	github.com/lib/pq v1.12.3 // indirect
+	github.com/pquerna/otp v1.5.0 // indirect
+)
