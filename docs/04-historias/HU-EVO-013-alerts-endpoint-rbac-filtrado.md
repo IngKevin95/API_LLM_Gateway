@@ -4,7 +4,7 @@ titulo: Filtrado RBAC en GET /alerts (respeta tenant + scopes)
 epica: EP-EVO-003
 prioridad: Should
 complejidad: M
-estado: draft
+estado: lista
 ---
 
 # Filtrado RBAC en GET /alerts (respeta tenant + scopes)
@@ -60,3 +60,7 @@ func (h *Handler) GetAlerts(w http.ResponseWriter, r *http.Request) {
 - Usa: HU-EVO-012 (table provider_alerts)
 - Integra: HU-009 (RBAC existente)
 - Alimenta: HU-EVO-015 (notificaciones)
+
+## Change
+
+Implementado en `openspec/changes/metrics-quota-alertas-rbac`. Ver `tasks.md` para el detalle de cobertura y desviaciones documentadas.
