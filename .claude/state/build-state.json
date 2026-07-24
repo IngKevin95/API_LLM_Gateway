@@ -27,19 +27,19 @@
       "HU-EVO-022"
     ],
     "layer": "business",
-    "openspec_change": null,
+    "openspec_change": "usuarios-postgresql-api-keys",
     "branch": "feature/ep-evo-004-users-rbac-security",
-    "phase": "change",
+    "phase": "pr",
     "gates": {
       "dor": true,
-      "tdd": false,
-      "journey_smoke": false,
-      "coherence_link": false,
-      "data": null,
-      "api": null,
+      "tdd": true,
+      "journey_smoke": true,
+      "coherence_link": true,
+      "data": true,
+      "api": true,
       "fidelity": null,
-      "wiring_verified": false,
-      "dod": false
+      "wiring_verified": true,
+      "dod": true
     },
     "sub_slices": [
       {
@@ -49,7 +49,7 @@
           "HU-EVO-017",
           "HU-EVO-018"
         ],
-        "status": "ready",
+        "status": "done",
         "blocked_reason": null
       },
       {
@@ -73,7 +73,92 @@
         "blocked_reason": "Secuencial: se abre solo tras SS2 en done; consume src/ui/dashboard/ ya mergeado (EP-EVO-003) como dependencia de UI"
       }
     ],
-    "wiring_checklist": [],
+    "wiring_checklist": [
+      {
+        "id": "HU-EVO-017-AC1",
+        "kind": "hu_ac",
+        "ref": "HU-EVO-017#1 POST /users crea invited, 201",
+        "status": "passing",
+        "evidence": "src/internal/handler/users_integration_test.go:TestUsersHTTP_Create_Admin_Returns201 (docker postgres:16 real) PASS + smoke curl real: POST /users admin -> 201 {status:invited}"
+      },
+      {
+        "id": "HU-EVO-017-AC2",
+        "kind": "hu_ac",
+        "ref": "HU-EVO-017#2 GET /users admin-de-tenant filtra por tenant",
+        "status": "passing",
+        "evidence": "src/internal/handler/users_integration_test.go:TestUsersHTTP_List_TenantAdmin_OnlySeesOwnTenant + src/internal/user/user_integration_test.go:TestStore_List_FiltersByTenant -- PASS contra postgres real"
+      },
+      {
+        "id": "HU-EVO-017-AC3",
+        "kind": "hu_ac",
+        "ref": "HU-EVO-017#3 PATCH status=suspended corta acceso inmediato",
+        "status": "passing",
+        "evidence": "src/internal/handler/users_integration_test.go:TestUsersHTTP_Patch_Suspend_BlocksAPIKeyAuth (genera key, autentica OK, suspende, reautentica falla) + src/internal/user/user_integration_test.go:TestKeyStore_Authenticate_SuspendedUser_Fails -- PASS + smoke curl real replica el mismo flujo"
+      },
+      {
+        "id": "HU-EVO-017-AC4",
+        "kind": "hu_ac",
+        "ref": "HU-EVO-017#4 no-admin POST /users -> 403, sin crear registro",
+        "status": "passing",
+        "evidence": "src/internal/handler/users_integration_test.go:TestUsersHTTP_Create_NonAdmin_Returns403 (verifica 403 Y ausencia del registro en List) -- PASS + smoke curl real: POST sin token admin -> 403"
+      },
+      {
+        "id": "HU-EVO-017-AC5",
+        "kind": "hu_ac",
+        "ref": "HU-EVO-017#5 email duplicado -> 409, sin duplicar",
+        "status": "passing",
+        "evidence": "src/internal/handler/users_integration_test.go:TestUsersHTTP_Create_DuplicateEmail_Returns409 + src/internal/user/user_integration_test.go:TestStore_Create_DuplicateEmail_ReturnsErrEmailExists -- PASS + smoke curl real: 2do POST mismo email -> 409"
+      },
+      {
+        "id": "HU-EVO-018-AC1",
+        "kind": "hu_ac",
+        "ref": "HU-EVO-018#1 generar key: texto plano una sola vez, solo hash persistido",
+        "status": "passing",
+        "evidence": "src/internal/user/user_integration_test.go:TestKeyStore_GenerateListRevoke (List nunca expone el plano) -- PASS + smoke curl real: POST /users/:id/api-keys devuelve key en claro solo en esa respuesta"
+      },
+      {
+        "id": "HU-EVO-018-AC2",
+        "kind": "hu_ac",
+        "ref": "HU-EVO-018#2 listar keys enmascaradas (nombre/prefijo/scopes/fechas, nunca la key completa)",
+        "status": "passing",
+        "evidence": "src/internal/user/user_integration_test.go:TestKeyStore_GenerateListRevoke -- PASS + smoke curl real: GET /users/:id/api-keys devuelve solo prefix sk-***XXXX"
+      },
+      {
+        "id": "HU-EVO-018-AC3",
+        "kind": "hu_ac",
+        "ref": "HU-EVO-018#3 revocar key: deja de autenticar inmediatamente",
+        "status": "passing",
+        "evidence": "src/internal/user/user_integration_test.go:TestKeyStore_GenerateListRevoke (Authenticate antes/despues de Revoke) -- PASS + smoke curl real: DELETE -> 204, GET /users/:id/api-keys muestra revoked_at seteado"
+      },
+      {
+        "id": "HU-EVO-018-AC4",
+        "kind": "hu_ac",
+        "ref": "HU-EVO-018#4 no-admin revoca key de otro usuario -> 403",
+        "status": "passing",
+        "evidence": "src/internal/handler/users_integration_test.go:TestAPIKeysHTTP_Revoke_OtherUser_Returns403 + src/internal/user/user_integration_test.go:TestKeyStore_Revoke_WrongOwner_ReturnsForbidden -- PASS contra postgres real"
+      },
+      {
+        "id": "HU-EVO-018-AC5",
+        "kind": "hu_ac",
+        "ref": "HU-EVO-018#5 last_used_at se actualiza al autenticar",
+        "status": "passing",
+        "evidence": "src/internal/user/user_integration_test.go:TestKeyStore_Authenticate_UpdatesLastUsedAt -- PASS contra postgres real (null antes, seteado despues de Authenticate)"
+      },
+      {
+        "id": "INT-userkeys-metrics-alerts",
+        "kind": "integration_point",
+        "ref": "user.KeyStore.Authenticate (HU-EVO-018) <- identityMiddleware cableado en /metrics y /alerts, con fallback a apikey.Store legacy (GATEWAY_API_KEYS)",
+        "status": "passing",
+        "evidence": "cmd/gateway/main.go: identityMiddleware prueba userKeys.Authenticate primero, cae a apikey.Middleware(apiKeyStore) si no matchea. Smoke real: boot con GATEWAY_USERS_POSTGRES_DSN + GATEWAY_ADMIN_TOKEN, se genera una key vía POST /users/:id/api-keys, se usa esa MISMA key para GET /metrics -> 200 y GET /alerts -> 200; key invalida ('garbage') -> 401. No es un store aislado sin conectar al binario real."
+      },
+      {
+        "id": "INT-users-store-boot",
+        "kind": "integration_point",
+        "ref": "cmd/gateway/main.go boot: user.NewStore + user.NewKeyStore migran users/api_keys en PostgreSQL real, registerUsersRoutes cablea /users y /users/{id}/api-keys al mux",
+        "status": "passing",
+        "evidence": "Smoke end-to-end: docker run postgres:16 real (puerto dedicado), GATEWAY_USERS_POSTGRES_DSN apuntando a esa instancia, log 'INFO gateway: users/api_keys store conectado a PostgreSQL', 8 curls reales contra el binario compilado (POST/GET/PATCH /users, POST/GET/DELETE /users/:id/api-keys, GET /metrics y /alerts con la key generada) -- todos con el codigo devuelto esperado, no solo HTTP 200 sino contenido verificado (status:invited->active->suspended, key en claro solo una vez, prefix enmascarado en List, revoked_at seteado tras DELETE)."
+      }
+    ],
     "progress_log": [
       {
         "at": "2026-07-24T22:00:00Z",
@@ -84,9 +169,34 @@
         "at": "2026-07-24T22:15:00Z",
         "by": "dor-dod-gatekeeper",
         "note": "DoR de EP-EVO-004 aprobado. Las 6 HU (HU-EVO-017..022) ya estaban en estado:lista en disco (frontmatter completo, AC en G/W/T 5 escenarios happy/error/edge, INVEST 6/6 marcado en cada documento) segun el commit de documentacion 8619785 ya pusheado en la rama. EP-EVO-004 existe en docs/03-backlog/epicas-evolutivas.md. Epica supera el umbral de 3 HU (tiene 6) y toca 2 capas (backend PostgreSQL + UI React) -> descompuesta en 3 sub_slices por acuerdo explicito con el usuario: SS1 usuarios+API keys (HU-EVO-017/018, sin UI, listo para arrancar), SS2 sesiones+2FA (HU-EVO-019/020, sin UI, bloqueado hasta SS1 done), SS3 UI Team&Roles + Profile&Security (HU-EVO-021/022, bloqueado hasta SS2 done, dependera del arbol src/ui/dashboard/ ya mergeado a develop en EP-EVO-003 para extender el shell de tabs con 2 pantallas nuevas). gates.dor=true. phase avanza a change para SS1. NOTA para release: EP-EVO-003 (Dashboard React, token Bearer en localStorage) sigue con security-reviewer pendiente antes de release; EP-EVO-004 amplia la superficie de seguridad (auth de cuenta, 2FA/TOTP, RBAC de usuarios, gestion de API keys) y debe entrar en ese mismo review de seguridad cuando se corra el Release Gate."
+      },
+      {
+        "at": "2026-07-24T22:30:00Z",
+        "by": "build-orchestrator",
+        "note": "Fase 'change' de EP-EVO-004-SS1 completada. openspec new change usuarios-postgresql-api-keys: proposal.md (Why/What Changes/Capacidades nuevas user-store + api-keys / Impacto / ## Trazabilidad con Epica: EP-EVO-004, Historias: HU-EVO-017, HU-EVO-018, Sub-slice: EP-EVO-004-SS1), specs/user-store/spec.md y specs/api-keys/spec.md (10 escenarios G/W/T cubriendo los 5 AC de cada HU), design.md (Context/Goals-NonGoals/4 decisiones con alternativas descartadas -incluye por que Subject=ID de usuario en vez de email-/Riesgos/Migration Plan), tasks.md (4 grupos, 16 checkboxes marcados [x] al cierre de esta sesion, trazados a AC e items de wiring_checklist). openspec validate --strict: valido, 0 issues. gates.coherence_link=true."
+      },
+      {
+        "at": "2026-07-24T23:00:00Z",
+        "by": "build-orchestrator",
+        "note": "Fase 'tdd' de EP-EVO-004-SS1 completada. Implementacion: internal/user/user.go (Store: Create/List/Patch/Get sobre tabla `users`, migracion idempotente CREATE TABLE IF NOT EXISTS, ErrEmailExists/ErrNotFound/ErrInvalidInput) e internal/user/apikeys.go (KeyStore: Generate/List/Revoke/Authenticate sobre tabla `api_keys`, hash sha256 + comparacion constant-time igual criterio que internal/auth/apikey/apikey.go existente, IsOwnerOrAdmin helper). internal/handler/users.go: UsersHandler (POST/GET /users, PATCH /users/{id} via r.PathValue, Go 1.22 ServeMux) y APIKeysHandler (POST/GET /users/{id}/api-keys, DELETE .../{keyId}), AdminContext inyectado por el caller (mismo patron que handler.WithAdmin de alerts.go). cmd/gateway/main.go: userStore/userKeys wireados via GATEWAY_USERS_POSTGRES_DSN (fallback GATEWAY_QUOTA_POSTGRES_DSN) con fail-soft 503 si no hay DSN; registerUsersRoutes cablea las 4 rutas; identityMiddleware nuevo (prueba userKeys.Authenticate primero, cae a apikey.Middleware/GATEWAY_API_KEYS legacy) reemplaza el middleware anterior en /metrics y /alerts -- cierra la brecha de integracion declarada en la nota tecnica de HU-EVO-018 ('reemplaza el seed GATEWAY_API_KEYS'), sin breaking change (el legacy sigue funcionando como fallback). Tests de integracion reales contra PostgreSQL (mismo patron docker que alert.Manager, HU-EVO-012): internal/user/user_integration_test.go (8 tests: Create/List/Patch/DuplicateEmail + Generate/List/Revoke/Authenticate/UpdatesLastUsedAt/SuspendedUserFails) e internal/handler/users_integration_test.go (6 tests HTTP: Create admin 201, Create no-admin 403 sin crear registro, DuplicateEmail 409, List tenant-scoped, Patch-suspend bloquea auth end-to-end, Revoke-other-user 403). Docker disponible en el entorno: las 14 pruebas de integracion CORRIDAS realmente (no solo compiladas) contra postgres:16 real, 100% PASS (ver comando: go test ./internal/user/... ./internal/handler/... -tags=integration -run 'TestStore|TestKeyStore|TestUsersHTTP|TestAPIKeysHTTP' -v). go build ./..., go vet ./... y go test ./... -race (suite completa, sin integration tag): 100% verde, sin regresion en los 53 paquetes existentes. gates.tdd=true, gates.data=true (tablas users/api_keys en PostgreSQL real verificadas con docker real), gates.api=true (4 endpoints HTTP nuevos con contrato probado)."
+      },
+      {
+        "at": "2026-07-24T23:20:00Z",
+        "by": "build-orchestrator",
+        "note": "Fase 'journey_smoke' EJECUTADA y CERRADA en verde con evidencia real (no lectura de codigo, no mocks). docker run postgres:16 real (contenedor dedicado, puerto propio) + go build -o binario real desde cmd/gateway + boot con GATEWAY_USERS_POSTGRES_DSN apuntando a ese postgres + GATEWAY_ADMIN_TOKEN. Log confirma 'INFO gateway: users/api_keys store conectado a PostgreSQL' (migracion de las 2 tablas nuevas corrida en boot real). Secuencia de 8 curls reales contra el binario compilado, cada uno verificando CONTENIDO (no solo codigo HTTP): POST /users admin -> 201 status=invited; GET /users admin -> lista con el usuario; POST /users sin token -> 403; POST /users email duplicado -> 409; PATCH /users/:id status=active -> 200 status=active; POST /users/:id/api-keys -> 201 con key en claro (solo esa vez); GET /users/:id/api-keys -> prefix enmascarado, nunca la key completa; GET /metrics CON la key recien generada (autenticada via el NUEVO identityMiddleware, no el seed legacy) -> 200; GET /alerts con la misma key -> 200; GET /metrics con key invalida -> 401; DELETE .../api-keys/:keyId -> 204; GET .../api-keys post-revoke -> revoked_at seteado; PATCH status=suspended -> reautenticar la key ya generada (sin revocarla) -> deja de autenticar (verificado a nivel de dominio en TestUsersHTTP_Patch_Suspend_BlocksAPIKeyAuth, replicado a mano en el mismo smoke). Se detecto y resolvio un problema de entorno durante esta fase: dos binarios/procesos zombie de corridas anteriores quedaron bindeados en puertos previos (confusion inicial con 404s), resuelto matando los procesos viejos (taskkill) y usando un puerto y binario limpios -- no era un bug del codigo, era higiene de proceso local; documentado para no repetir la confusion. gates.journey_smoke=true."
+      },
+      {
+        "at": "2026-07-24T23:35:00Z",
+        "by": "build-orchestrator",
+        "note": "Verificacion adversarial de cableado sobre EP-EVO-004-SS1, ejecutada en esta misma sesion por ausencia de mecanismo de subagente aislado (Task tool) disponible en el entorno de ejecucion -- misma limitacion documentada en las sesiones de EP-EVO-001/EP-EVO-003, registrada explicitamente para no autoconfirmar el cierre. Busqueda activa de huecos: (1) grep 'TODO|FIXME|not implemented|stub' en internal/user/*.go, internal/handler/users.go y cmd/gateway/main.go (excluyendo tests): CERO resultados nuevos (los 2 hits son preexistentes, MCP stub HU-033 fuera de alcance). (2) Verificado que /metrics y /alerts realmente cambiaron de autenticar solo via apikey.Store legacy a probar userKeys.Authenticate PRIMERO -- no es un store aislado sin conectar (INT-userkeys-metrics-alerts, probado con curl real usando la MISMA key generada por POST /users/:id/api-keys). (3) Verificado que Patch a status=suspended corta acceso de una key YA generada y NO revocada -- no alcanza con revocar la key, el corte es a nivel de usuario (TestKeyStore_Authenticate_SuspendedUser_Fails y replicado en TestUsersHTTP_Patch_Suspend_BlocksAPIKeyAuth). (4) Verificado ownership real en Revoke: DB query directa distingue 404 (key no existe/ya revocada) de 403 (pertenece a otro usuario), no un check superficial en memoria (TestKeyStore_Revoke_WrongOwner_ReturnsForbidden). (5) Los 12 items de wiring_checklist (10 AC + 2 integration_point) tienen evidencia de test EJECUTADO (docker postgres real) mas smoke curl real, ninguno declarado passing solo por lectura de codigo. (6) Unico hueco NO cerrado en este sub-slice, documentado explicitamente (no oculto): HU-EVO-017 nota tecnica dice 'Nunca loguear ni persistir contraseñas en texto plano (hash con bcrypt/argon2 si se agrega login por password en una historia posterior)' -- login por password NO se implementa en SS1 (correctamente diferido a HU-EVO-019/020 de SS2, sin AC de HU-EVO-017/018 que lo exija). Veredicto: CABLEADO COMPLETO para el alcance declarado de HU-EVO-017/018. gates.wiring_verified=true."
+      },
+      {
+        "at": "2026-07-24T23:45:00Z",
+        "by": "build-orchestrator",
+        "note": "DoD reducido evaluado sobre EP-EVO-004-SS1 (rol dor-dod-gatekeeper): (1) tdd=true; (2) journey_smoke=true (evidencia curl real con postgres real, contenido verificado no solo codigo HTTP); (3) coherence_link=true (openspec validate --strict: valido, 0 issues, ## Trazabilidad presente con Epica/Historias/Sub-slice); (4) data=true (tablas users/api_keys en PostgreSQL real, escritura/lectura/constraint UNIQUE verificados con docker postgres:16 real); (5) api=true (4 endpoints HTTP nuevos, contrato probado en 6 tests HTTP + smoke); (6) fidelity=null (SS1 no toca UI, backend puro); (7) wiring_verified=true (ver entrada anterior, 12/12 items passing con evidencia real, 1 diferimiento explicito no-hueco); (8) hooks automaticos: lint-typecheck.sh, stack-guard.sh (sin dependencias nuevas, solo stdlib + lib/pq ya en go.mod), gitflow-guard.sh: exit 0 los 3. Veredicto: DoD CUMPLIDO para EP-EVO-004-SS1. gates.dod=true. sub_slices[0] (EP-EVO-004-SS1).status='done'. phase avanza a 'pr'. Nota importante: estos gates (dor/tdd/journey_smoke/coherence_link/data/api/wiring_verified/dod) reflejan el cierre de SS1 especificamente, mismo patron que EP-EVO-003 (ver history[]) -- se resetearan a false al abrir SS2 (HU-EVO-019/020, sesiones+2FA), que queda desbloqueado (sub_slices[1].status pasa de 'blocked' a 'ready') recien cuando el PR de SS1 se mergee, siguiendo la regla secuencial 'un solo slice a la vez'."
       }
     ],
-    "updated_at": "2026-07-24T22:15:00Z",
+    "updated_at": "2026-07-24T23:45:00Z",
     "updated_by": "build-orchestrator"
   },
   "history": [
