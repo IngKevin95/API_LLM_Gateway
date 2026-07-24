@@ -363,3 +363,54 @@ Fuente: `docs/01-prd/api-llm-gateway.md`. Objetivos del PRD:
 - Obj. 5 â†’ EP-005 (base), EP-010 (parÃ¡metros completos, normalizaciÃ³n), EP-011 (handlers funcionales)
 
 **Ã‰picas huÃ©rfanas** (sin objetivo): ninguna. Toda Ã©pica ata a â‰¥1 objetivo del PRD.
+
+---
+
+## EP-012 · Fase 2: Persistencia, Caché y Auto-Aprendizaje
+
+| Campo | Valor |
+|---|---|
+| Objetivo(s) del PRD cubiertos | Obj. 2, Obj. 3, Obj. 4 |
+| Capa (build) | advanced |
+| OpenSpec change | fase2-core-avanzado |
+| Métrica de éxito | Cuotas y logs persisten en PostgreSQL sin latencia síncrona; respuestas repetidas se sirven en < 20ms desde la Semantic Cache; Router ajusta pesos dinámicamente. |
+
+**De qué se trata**: Implementación de los motores de persistencia e inteligencia avanzada de la Fase 2/3. 
+
+**Capabilities que agrupa**:
+- **Persistencia Real**: Conexión a PostgreSQL para persistir el Quota Manager y la Auditoría (abandonando la memoria efímera).
+- **Caché Semántica**: Integración con base de datos vectorial (ej. pgvector/Milvus) para evitar llamadas redundantes y ahorrar costos.
+- **Learning Engine**: Módulo que consume la telemetría histórica y ajusta los pesos de scoring automáticamente (auto-ruteo inteligente).
+- **Cache Invalidator**: Mecanismo (Webhooks/Polling) para invalidar llaves y cuotas al instante cuando se actualicen.
+
+**Historias anticipadas**:
+- HU-061 — Migrar Quota Manager a PostgreSQL
+- HU-062 — Implementar Semantic Cache con Vector DB
+- HU-063 — Learning Engine: Loop de retroalimentación de métricas a Router
+- HU-064 — Cache Invalidator para propagar cambios de DB a RAM
+
+---
+
+## EP-013 · Fase 2: Plataforma Autónoma y Gobernanza de Proveedores (Dashboard)
+
+| Campo | Valor |
+|---|---|
+| Objetivo(s) del PRD cubiertos | Obj. 4 |
+| Capa (build) | user-interface |
+| OpenSpec change | fase2-dashboard-autonomo |
+| Métrica de éxito | Administrador puede crear tokens de proveedores desde el dashboard; puede visualizar la cuota y gasto exacto por modelo en tiempo real. |
+
+**De qué se trata**: Dotar al UI (Dashboard) de capacidades completas de administración para que la plataforma sea 100% autónoma, sin depender de archivos YAML editados manualmente.
+
+**Capabilities que agrupa**:
+- **Gestión de Tokens (Credentials Manager)**: Crear, rotar y eliminar API Keys de proveedores externos (OpenAI, Anthropic, etc.) directamente desde la interfaz.
+- **Visor de Cuotas por Modelo**: Dashboard detallado mostrando el consumo exacto, rate limit restante y costos discriminados por modelo.
+- **Gestión de Tenants y Agentes**: Creación y revocación de API Keys de los clientes/consumidores desde el Dashboard.
+- **Alertas Proactivas**: Configuración de umbrales para notificar (Slack/Email) cuando una cuota se acerque al límite.
+
+**Historias anticipadas**:
+- HU-065 — Interfaz para inyectar y encriptar tokens de proveedores (KMS)
+- HU-066 — Vista detallada de cuotas y costos segregados por Modelo
+- HU-067 — Administrador de Tenants y API Keys de Consumidores en UI
+- HU-068 — Sistema de Alertas proactivas de agotamiento de saldo/cuota
+
