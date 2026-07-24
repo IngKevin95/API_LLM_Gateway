@@ -40,6 +40,7 @@ import (
 	"api-llm-gateway/internal/registry"
 	"api-llm-gateway/internal/router"
 	"api-llm-gateway/internal/tokenizer"
+	"api-llm-gateway/internal/user"
 )
 
 // freeTierConfigPath es la ruta por defecto del catálogo de proveedores
@@ -198,21 +199,79 @@ func main() {
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	// apiKeyStore resuelve identidades no-admin (HU-EVO-013, y HU-EVO-011 AC5
-	// para /metrics), seedeadas vía GATEWAY_API_KEYS. Compartido entre
-	// /metrics y /alerts: mismas credenciales, mismo mecanismo de scope.
+	// apiKeyStore resuelve identidades no-admin legacy (HU-EVO-013, y
+	// HU-EVO-011 AC5 para /metrics), seedeadas vía GATEWAY_API_KEYS.
+	// HU-EVO-018 agrega el store de PostgreSQL (userKeys, cableado más abajo)
+	// como fuente adicional/reemplazo gradual: identityMiddleware prueba
+	// userKeys primero y cae a apiKeyStore/env si no matchea, así una
+	// instalación puede migrar sin invalidar las keys legacy de un día para
+	// el otro.
 	apiKeyStore := apikey.NewStore()
 	loadAPIKeysFromEnv(apiKeyStore)
 
+	// HU-EVO-017/HU-EVO-018: store de usuarios + API keys en PostgreSQL,
+	// opt-in vía GATEWAY_USERS_POSTGRES_DSN (fallback: la misma DSN de cuota,
+	// GATEWAY_QUOTA_POSTGRES_DSN, para no exigir una segunda variable en
+	// despliegues con una sola instancia PostgreSQL). Fail-soft: sin DSN o si
+	// la conexión falla, /users y /users/{id}/api-keys quedan deshabilitados
+	// (503) en vez de tumbar el boot.
+	var userStore *user.Store
+	var userKeys *user.KeyStore
+	usersDSN := os.Getenv("GATEWAY_USERS_POSTGRES_DSN")
+	if usersDSN == "" {
+		usersDSN = os.Getenv("GATEWAY_QUOTA_POSTGRES_DSN")
+	}
+	if usersDSN != "" {
+		if udb, err := sql.Open("postgres", usersDSN); err != nil {
+			log.Printf("WARN gateway: users store sin DB (sql.Open): %v", err)
+		} else if err := udb.PingContext(context.Background()); err != nil {
+			log.Printf("WARN gateway: users store sin DB (ping): %v", err)
+			_ = udb.Close()
+		} else if us, err := user.NewStore(udb); err != nil {
+			log.Printf("WARN gateway: users store migración falló: %v", err)
+			_ = udb.Close()
+		} else if ks, err := user.NewKeyStore(udb, us); err != nil {
+			log.Printf("WARN gateway: api_keys store migración falló: %v", err)
+			_ = udb.Close()
+		} else {
+			userStore, userKeys = us, ks
+			log.Printf("INFO gateway: users/api_keys store conectado a PostgreSQL")
+		}
+	} else {
+		log.Printf("WARN gateway: GATEWAY_USERS_POSTGRES_DSN no configurado, /users deshabilitado")
+	}
+	registerUsersRoutes(mux, userStore, userKeys, os.Getenv("GATEWAY_ADMIN_TOKEN"))
+
+	// identityMiddleware (HU-EVO-018): intenta resolver la identidad primero
+	// contra userKeys (PostgreSQL, reemplazo declarado por la HU); si no hay
+	// userKeys configurado o la key no matchea ahí, cae a apiKeyStore (seed
+	// legacy GATEWAY_API_KEYS) para no romper despliegues que todavía no
+	// migraron. Ambas rutas terminan inyectando auth.Identity en el contexto
+	// vía apikey.Middleware o manualmente.
+	identityMiddleware := func(next http.Handler) http.Handler {
+		legacy := apikey.Middleware(apiKeyStore)(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if userKeys != nil {
+				if token := extractBearer(r); token != "" {
+					if id, ok := userKeys.Authenticate(r.Context(), token); ok {
+						next.ServeHTTP(w, r.WithContext(auth.WithIdentity(r.Context(), id)))
+						return
+					}
+				}
+			}
+			legacy.ServeHTTP(w, r)
+		})
+	}
+
 	// HU-060: /metrics endpoint con datos reales en memoria. Admin (token
-	// estático GATEWAY_ADMIN_TOKEN) ve todo sin filtrar; una identidad de
-	// apiKeyStore (no-admin) ve el bloque quota filtrado por scope (AC5).
-	// Sin admin y sin key válida: 401.
+	// estático GATEWAY_ADMIN_TOKEN) ve todo sin filtrar; una identidad
+	// resuelta por identityMiddleware (no-admin) ve el bloque quota filtrado
+	// por scope (AC5). Sin admin y sin key válida: 401.
 	metricsHandler := metrics.NewHandler(metricsStore)
 	if metricsHandlerCapabilityLookup != nil {
 		metricsHandler.SetCapabilityLookup(metricsHandlerCapabilityLookup)
 	}
-	metricsAuthenticated := apikey.Middleware(apiKeyStore)(metricsHandler)
+	metricsAuthenticated := identityMiddleware(metricsHandler)
 	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
 		adminToken := os.Getenv("GATEWAY_ADMIN_TOKEN")
 		if adminToken != "" && r.Header.Get("Authorization") == "Bearer "+adminToken {
@@ -224,10 +283,11 @@ func main() {
 
 	// HU-EVO-013: GET /alerts, RBAC-aware. Admin (mismo token estático que
 	// /metrics) ve todas las alertas sin filtro; cualquier otra identidad
-	// resuelta por apikey.Middleware (mismo apiKeyStore) solo ve alertas de
-	// modelos cubiertos por sus scopes. Sin identidad y sin admin: 401.
+	// resuelta por identityMiddleware (userKeys o apiKeyStore legacy) solo ve
+	// alertas de modelos cubiertos por sus scopes. Sin identidad y sin admin:
+	// 401.
 	alertsHandler := handler.NewAlertsHandler(alertDB, handler.CapabilityLookup(metricsHandlerCapabilityLookup))
-	alertsAuthenticated := apikey.Middleware(apiKeyStore)(alertsHandler)
+	alertsAuthenticated := identityMiddleware(alertsHandler)
 	mux.HandleFunc("/alerts", func(w http.ResponseWriter, r *http.Request) {
 		adminToken := os.Getenv("GATEWAY_ADMIN_TOKEN")
 		if adminToken != "" && r.Header.Get("Authorization") == "Bearer "+adminToken {
@@ -371,6 +431,71 @@ func buildCapabilityLookup(reg *registry.Registry) func(provider, model string) 
 		}
 		return caps
 	}
+}
+
+// registerUsersRoutes cablea /users, /users/{id} y /users/{id}/api-keys*
+// (HU-EVO-017/HU-EVO-018). Si userStore es nil (sin PostgreSQL configurada),
+// responde 503 a todas las rutas en vez de nil-pointer panic.
+func registerUsersRoutes(mux *http.ServeMux, userStore *user.Store, userKeys *user.KeyStore, adminToken string) {
+	unavailable := func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, `{"error":"users store not configured"}`, http.StatusServiceUnavailable)
+	}
+	if userStore == nil || userKeys == nil {
+		mux.HandleFunc("/users", unavailable)
+		mux.HandleFunc("PATCH /users/{id}", unavailable)
+		mux.HandleFunc("/users/{id}/api-keys", unavailable)
+		mux.HandleFunc("DELETE /users/{id}/api-keys/{keyId}", unavailable)
+		return
+	}
+
+	usersHandler := handler.NewUsersHandler(userStore)
+	apiKeysHandler := handler.NewAPIKeysHandler(userKeys)
+
+	wrap := func(h http.Handler) http.HandlerFunc {
+		return resolveUserAuth(adminToken, userKeys, userStore, h)
+	}
+
+	mux.HandleFunc("/users", wrap(usersHandler))
+	mux.HandleFunc("PATCH /users/{id}", wrap(http.HandlerFunc(usersHandler.PatchUser)))
+	mux.HandleFunc("/users/{id}/api-keys", wrap(apiKeysHandler))
+	mux.HandleFunc("DELETE /users/{id}/api-keys/{keyId}", wrap(http.HandlerFunc(apiKeysHandler.RevokeAPIKey)))
+}
+
+// resolveUserAuth resuelve AdminContext + auth.Identity para el dominio de
+// usuarios: token estático GATEWAY_ADMIN_TOKEN = admin global; si no, intenta
+// autenticar la API key contra userKeys.Authenticate y, si el usuario
+// resuelto tiene role=admin, promueve a admin de su propio tenant (no
+// global). Delega el 401/403 final a cada handler (algunos endpoints son
+// admin-only, otros owner-or-admin).
+func resolveUserAuth(adminToken string, userKeys *user.KeyStore, userStore *user.Store, next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		ac := handler.AdminContext{}
+
+		if adminToken != "" && r.Header.Get("Authorization") == "Bearer "+adminToken {
+			ac = handler.AdminContext{IsAdmin: true, GlobalAdmin: true}
+		} else if token := extractBearer(r); token != "" {
+			if id, ok := userKeys.Authenticate(ctx, token); ok {
+				ctx = auth.WithIdentity(ctx, id)
+				ac.Tenant = id.Tenant
+				if u, err := userStore.Get(ctx, id.Subject); err == nil && u.Role == user.RoleAdmin {
+					ac.IsAdmin = true
+				}
+			}
+		}
+
+		req := r.WithContext(ctx)
+		req = handler.WithAdminContextValue(req, ac)
+		next.ServeHTTP(w, req)
+	}
+}
+
+func extractBearer(r *http.Request) string {
+	h := r.Header.Get("Authorization")
+	if strings.HasPrefix(h, "Bearer ") {
+		return strings.TrimSpace(strings.TrimPrefix(h, "Bearer "))
+	}
+	return ""
 }
 
 // loadAPIKeysFromEnv seedea el apikey.Store desde GATEWAY_API_KEYS
