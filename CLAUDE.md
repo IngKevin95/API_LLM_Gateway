@@ -81,6 +81,25 @@ Documentos de referencia en orden de lectura:
 - `docs/13-tech-prd/api-llm-gateway.md` — especificación técnica, YAML schema, SLA
 - `docs/04-historias/HU-*.md` — 48 historias traceadas a épicas con AC en formato Given/When/Then
 
+### Coexistencia pipeline legacy (EP-001..EP-011) y arnés de build (EP-EVO-XXX)
+
+El pipeline "legacy" de discovery (`EP-001..EP-011`, historias `HU-001..HU-0XX`) **no es solo
+documentación muerta**: varias de esas historias tienen implementación real ya en el código (ej.
+`HU-053` → `src/internal/adapter/omniroute/`). No asumir que un `HU-XXX` de rango bajo es
+discovery sin construir — verificar contra `src/` antes de tocar esa área o de darla por
+redundante.
+
+- El **arnés de build** (`EP-EVO-XXX`, estado en `.claude/state/build-state.json`) es el proceso
+  vigente para nuevo trabajo, pero no reescribe retroactivamente el historial de lo ya construido
+  bajo el pipeline legacy.
+- Si una historia legacy y una historia del arnés describen el mismo alcance (caso `HU-036` vs
+  `HU-053`, ambas "adaptador OmniRoute"), se marca la legacy como `estado: obsoleta` con
+  `supersedida_por` apuntando a la del arnés, y se deja referencia cruzada en ambos archivos — la
+  del arnés queda como canónica porque es la que tiene código y tests detrás.
+- Antes de tocar código bajo un componente documentado en el pipeline legacy, revisar si existe
+  una `HU-XXX` correspondiente en `docs/04-historias/` para no duplicar ni contradecir AC ya
+  validados.
+
 ## Principio central de diseño
 
 Los agentes **no consumen modelos, consumen capacidades**:
