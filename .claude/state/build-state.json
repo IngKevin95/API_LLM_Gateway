@@ -22,7 +22,7 @@
     "layer": "business",
     "openspec_change": "adapters-proveedores-gratuitos-curados",
     "branch": "feature/ep-evo-001-adapters-gratuitos",
-    "phase": "pr",
+    "phase": "archived",
     "gates": {
       "dor": true,
       "tdd": true,
@@ -117,6 +117,11 @@
         "by": "build-orchestrator",
         "note": "DoD reducido (rol dor-dod-gatekeeper) evaluado sobre los 10 items: (1) tdd=true; (2) journey_smoke=true; (3) coherence_link=true (openspec validate --strict: valido); (4) data=null (Quota Manager in-memory, sin store nuevo en este slice); (5) api=null (sin endpoints HTTP nuevos); (6) fidelity=null (EP-EVO-001 no toca UI); (7) sub_slices=[] (vacio, N/A -- la epica no supero el umbral de descomposicion: 5 HU pero 1 sola capa de negocio backend, layer:business, sin frontend/infra nuevos); (8) wiring_verified=true (ver entrada anterior); (9) documentacion: tasks.md completo con diferimientos explicitos marcados, back-reference agregado en las 5 HU y en la epica (ver backfill_docs); (10) hooks automaticos: lint-typecheck.sh exit 0, stack-guard.sh exit 0, gitflow-guard.sh exit 0. Veredicto: DoD CUMPLIDO. gates.dod=true. phase avanza a 'pr'.",
         "branch_prep": "Rama feature/ep-evo-001-adapters-gratuitos creada desde main y poblada con 6 commits granulares, cada uno compilable de forma independiente (verificado con git worktree + go build ./... por commit): 2db5434 feat(adapter) HU-EVO-001, 3c2129b feat(registry) HU-EVO-002, 0c6e785 test(adapter) HU-EVO-003, 2cce83a feat(health) HU-EVO-004, 69d0b9b feat(quota) HU-EVO-005, 9cd6368 feat(gateway) wiring+openspec change+integration tests. go build/vet/test -race en HEAD de la rama: 100% verde. Push a origin bloqueado por el sistema de permisos de la sesion (git push requiere aprobacion explicita del usuario, no ejecutado). NOTA DE ALCANCE: se dejaron fuera de este branch/PR los cambios no pertenecientes a EP-EVO-001 detectados en el working tree (bump de .claude/.build-harness-version, ediciones de building-a-slice/SKILL.md, CLAUDE.md, docs/03-backlog/backlog.md, skill flujo-cc/, archivos EP-010-*.md y docs/.flow-cc-state.json, docs/07-cambios/ y HU-EVO-006..015 de EP-EVO-002/003) para respetar la regla 1 epica = 1 change = 1 rama = 1 PR; quedan pendientes de su propio commit/PR en otra sesion si corresponde."
+      },
+      {
+        "at": "2026-07-24T03:46:38Z",
+        "by": "build-orchestrator",
+        "note": "PR #37 (feature/ep-evo-001-adapters-gratuitos -> develop) mergeado con aprobacion explicita del usuario (doble confirmacion: 'mergea por favor' + 'si' tras pregunta de confirmacion). Merge commit c1932269e7a6cac6264ff3db36c9070889f03c17. active_slice.phase='archived'. Pendiente para una proxima sesion: mover EP-EVO-001 de active_slice a history[] con status:done, correr /build:setup para rellenar el bloque de dominio de CLAUDE.md (revertido a placeholders por el bump de harness commiteado en 9da4dc7), y evaluar el default del Release Gate segun regla de building-a-slice (EP-EVO-001 es la primera epica de una linea evolutiva nueva -CC-001-, no cierra una linea completa del Story Map; 1 epica archivada desde el ultimo releases[] -> no se recomienda correrlo todavia, salvo que se sumen 2+)."
       }
     ]
   },
