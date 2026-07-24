@@ -1,0 +1,56 @@
+import { useState } from 'react';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import useMetrics from './hooks/useMetrics';
+import useAlerts from './hooks/useAlerts';
+import Overview from './Overview';
+import Quotas from './Quotas';
+import Alerts from './Alerts';
+import Providers from './Providers';
+import SettingsModal from './SettingsModal';
+
+const TABS = ['Overview', 'Quotas', 'Alerts', 'Providers'];
+
+export default function Dashboard() {
+  const [activeTab, setActiveTab] = useState('Overview');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const { metrics } = useMetrics();
+  const { alerts } = useAlerts();
+
+  return (
+    <div className="gateway-ops-dark" data-testid="dashboard-root">
+      <header className="dashboard-header">
+        <h1>API LLM Gateway — Dashboard</h1>
+        <button type="button" onClick={() => setSettingsOpen(true)} data-testid="open-settings">
+          Settings
+        </button>
+      </header>
+
+      <nav className="tabs" role="tablist" aria-label="Dashboard tabs">
+        {TABS.map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab}
+            className={activeTab === tab ? 'tab-active' : 'tab'}
+            data-testid={`tab-${tab.toLowerCase()}`}
+            onClick={() => setActiveTab(tab)}
+          >
+            {tab}
+          </button>
+        ))}
+      </nav>
+
+      <main>
+        {activeTab === 'Overview' && <Overview metrics={metrics} />}
+        {activeTab === 'Quotas' && <Quotas metrics={metrics} />}
+        {activeTab === 'Alerts' && <Alerts alerts={alerts} />}
+        {activeTab === 'Providers' && <Providers metrics={metrics} />}
+      </main>
+
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      <ToastContainer position="bottom-right" theme="dark" />
+    </div>
+  );
+}

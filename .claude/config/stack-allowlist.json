@@ -6,7 +6,31 @@
     "node": ">=18.18",
     "packageManager": "npm"
   },
-  "allow": [],
+  "allow": [
+    "openai",
+    "cross-env",
+    "react",
+    "react-dom",
+    "react-toastify",
+    "vite",
+    "vitest",
+    "@vitejs/plugin-react",
+    "@testing-library/react",
+    "@testing-library/jest-dom",
+    "jsdom"
+  ],
   "deny_examples": [],
-  "rationale": {}
+  "rationale": {
+    "cross-env": "Node 22+/25 define global localStorage experimental que rompe jsdom en tests (window.localStorage.clear no es funcion); cross-env fija NODE_OPTIONS=--no-experimental-webstorage en npm run test:ui de forma portable (Windows/Unix)",
+    "openai": "Dependencia preexistente en package.json raiz (cliente MCP/agentes consumidores); no forma parte de este change, solo se registra para no bloquear stack-guard.sh",
+    "react": "PRD tecnico linea 56: 'Dashboard ligero de React/Next (Fase 2) para visualizacion' -- EP-EVO-003 SS2 (HU-EVO-014/015)",
+    "react-dom": "Requisito de React para render en DOM del navegador",
+    "react-toastify": "Nota tecnica HU-EVO-015: notificaciones toast (warning/critical) sobre alertas de cuota",
+    "vite": "Build tool elegido (design.md de ui-react-dashboard-notificaciones, decision 1) sobre Next.js: SPA cliente puro sin necesidad de SSR",
+    "vitest": "Test runner alineado con Vite para TDD de componentes/hooks del dashboard",
+    "@vitejs/plugin-react": "Plugin oficial de Vite para JSX/Fast Refresh",
+    "@testing-library/react": "Testing de componentes React siguiendo TDD (superpowers:test-driven-development)",
+    "@testing-library/jest-dom": "Matchers de accesibilidad/DOM para Vitest",
+    "jsdom": "Entorno DOM para correr tests de componentes React sin navegador real"
+  }
 }

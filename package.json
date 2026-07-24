@@ -7,7 +7,10 @@
     "doc": "docs"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev:ui": "vite --config src/ui/dashboard/vite.config.js",
+    "build:ui": "vite build --config src/ui/dashboard/vite.config.js",
+    "test:ui": "cross-env NODE_OPTIONS=--no-experimental-webstorage vitest run --config src/ui/dashboard/vite.config.js"
   },
   "repository": {
     "type": "git",
@@ -22,6 +25,18 @@
   },
   "homepage": "https://github.com/IngKevin95/API_LLM_Gateway#readme",
   "dependencies": {
-    "openai": "^6.48.0"
+    "openai": "^6.48.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-toastify": "^10.0.5"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.8",
+    "@vitejs/plugin-react": "^4.3.4",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "jsdom": "^25.0.1"
   }
 }
