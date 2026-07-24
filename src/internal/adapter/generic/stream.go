@@ -125,10 +125,62 @@ type sseStream struct {
 	provider string
 }
 
+// streamErrorChunk detecta un evento de error SSE mid-stream, formato
+// compartido por OpenAI y Claude: `data: {"error": {"type": "...", "message": "..."}}`.
+// HU-EVO-0010 AC4: un 429/rate-limit llegado a mitad del stream aborta sin
+// intentar failover transparente (a diferencia del pre-stream, que sí lo hace
+// vía checkStatus antes de abrir la conexión).
+type streamErrorChunk struct {
+	Error struct {
+		Type    string `json:"type"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+func detectStreamError(payload, provider string) *adapter.ProviderError {
+	payload = strings.TrimSpace(payload)
+	if payload == "" || payload == "[DONE]" {
+		return nil
+	}
+	var ch streamErrorChunk
+	if err := json.Unmarshal([]byte(payload), &ch); err != nil {
+		return nil
+	}
+	if ch.Error.Type == "" && ch.Error.Message == "" {
+		return nil
+	}
+	status := 502
+	if strings.Contains(strings.ToLower(ch.Error.Type), "rate_limit") {
+		status = 429
+	}
+	msg := ch.Error.Message
+	if msg == "" {
+		msg = ch.Error.Type
+	}
+	return &adapter.ProviderError{
+		Provider:  provider,
+		Status:    status,
+		Retryable: false, // AC4: sin failover transparente mid-stream
+		Err:       errors.New(msg),
+	}
+}
+
 func (s *sseStream) read(sc *bufio.Scanner, parse lineParser) {
 	defer close(s.tokens)
 	for sc.Scan() {
-		token, done, matched := parse(sc.Text())
+		line := sc.Text()
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "data:") {
+			payload := strings.TrimSpace(strings.TrimPrefix(trimmed, "data:"))
+			if perr := detectStreamError(payload, s.provider); perr != nil {
+				select {
+				case s.errc <- perr:
+				case <-s.done:
+				}
+				return
+			}
+		}
+		token, done, matched := parse(line)
 		if done {
 			return
 		}
@@ -150,10 +202,23 @@ func (s *sseStream) read(sc *bufio.Scanner, parse lineParser) {
 }
 
 func (s *sseStream) Next() (string, bool, error) {
+	// errc se chequea primero, sin bloquear: si read() ya cerró tokens *y*
+	// dejó un error pendiente (ej. abort mid-stream, HU-EVO-0010 AC4), el
+	// error tiene prioridad sobre el cierre silencioso del canal de tokens.
+	select {
+	case err := <-s.errc:
+		return "", false, err
+	default:
+	}
 	select {
 	case tok, ok := <-s.tokens:
 		if !ok {
-			return "", false, nil
+			select {
+			case err := <-s.errc:
+				return "", false, err
+			default:
+				return "", false, nil
+			}
 		}
 		return tok, true, nil
 	case err := <-s.errc:
