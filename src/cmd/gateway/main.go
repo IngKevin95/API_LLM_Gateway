@@ -18,10 +18,13 @@ import (
 	adapteranthropc "api-llm-gateway/internal/adapter/anthropic"
 	adaptergoogle "api-llm-gateway/internal/adapter/google"
 	adapterlocal "api-llm-gateway/internal/adapter/local"
+	adapteromniroute "api-llm-gateway/internal/adapter/omniroute"
 	adapteropenai "api-llm-gateway/internal/adapter/openai"
 	apianthropic "api-llm-gateway/internal/api/anthropic"
 	apiopenai "api-llm-gateway/internal/api/openai"
 	"api-llm-gateway/internal/failover"
+	"api-llm-gateway/internal/metrics"
+	"api-llm-gateway/internal/middleware"
 	"api-llm-gateway/internal/registry"
 	"api-llm-gateway/internal/router"
 	"api-llm-gateway/internal/tokenizer"
@@ -42,6 +45,9 @@ func main() {
 		}
 	}
 
+	// HU-060: metrics store (shared by processor and handler)
+	metricsStore := metrics.NewInMemoryStore(10000)
+
 	var processor *GatewayProcessor
 	if cfgPath != "" {
 		var err error
@@ -59,8 +65,8 @@ func main() {
 		// Build Failover Engine (EP-002)
 		fe := failover.New(rt, adapters)
 
-		// Create Processor that uses Failover
-		processor = NewGatewayProcessor(fe)
+		// Create Processor that uses Failover and metrics
+		processor = NewGatewayProcessor(fe, metricsStore)
 	} else {
 		log.Printf("WARN gateway: sin config.yaml, arrancando en modo scaffold (solo /health)")
 	}
@@ -70,11 +76,16 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
-	// ponytail: /metrics es un stub JSON hasta HU-017/HU-023 (EP-007).
-	mux.HandleFunc("/metrics", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{}`))
+
+	// HU-060: /metrics endpoint con datos reales en memoria
+	metricsHandler := metrics.NewHandler(metricsStore)
+	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
+		adminToken := os.Getenv("GATEWAY_ADMIN_TOKEN")
+		if adminToken == "" || r.Header.Get("Authorization") != "Bearer "+adminToken {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+		metricsHandler.ServeHTTP(w, r)
 	})
 
 	// Register OpenAI-compatible endpoints (HU-012a, HU-012b, HU-012c)
@@ -117,9 +128,13 @@ func main() {
 		writeTimeout = 30 * time.Second
 	}
 
+	// Aplicar middleware de request ID
+	var handler http.Handler = mux
+	handler = middleware.RequestID(handler)
+
 	srv := &http.Server{
 		Addr:              ":" + port,
-		Handler:           mux,
+		Handler:           handler,
 		ReadHeaderTimeout: readHeaderTimeout,
 		WriteTimeout:      writeTimeout,
 	}
@@ -171,6 +186,12 @@ func buildAdapters(reg *registry.Registry) map[string]adapter.Adapter {
 
 	// Add local Ollama if available (no API key needed)
 	adapters["local"] = adapterlocal.New("http://localhost:11434")
+
+	// Add OmniRoute adapter (local provider, no API key needed)
+	adapters["omniroute"] = adapteromniroute.New(adapteromniroute.Config{
+		BaseURL: "http://omniroute:20128/v1",
+		APIKey:  "",
+	})
 
 	return adapters
 }

@@ -1,0 +1,136 @@
+{
+  "info": {
+    "name": "API LLM Gateway",
+    "description": "Collection para testing del API LLM Gateway con OmniRoute",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health & Status",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8080/health"
+          },
+          "response": []
+        },
+        {
+          "name": "Metrics",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:8080/metrics"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "OpenAI Compatible",
+      "item": [
+        {
+          "name": "Chat Completion - GPT-4o",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "url": "http://localhost:8080/v1/chat/completions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"model\":\"gpt-4o\",\"messages\":[{\"role\":\"user\",\"content\":\"Responde brevemente con 'OK'\"}],\"max_tokens\":10}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Chat Completion - Claude Opus",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "url": "http://localhost:8080/v1/chat/completions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"model\":\"claude-opus-4\",\"messages\":[{\"role\":\"user\",\"content\":\"Responde brevemente con 'OK'\"}],\"max_tokens\":10}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Embeddings",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "url": "http://localhost:8080/v1/embeddings",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"model\":\"text-embedding-3-small\",\"input\":\"test embedding\"}"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Anthropic Compatible",
+      "item": [
+        {
+          "name": "Messages - Claude",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "url": "http://localhost:8080/v1/messages",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"model\":\"claude-opus-4\",\"messages\":[{\"role\":\"user\",\"content\":\"test\"}],\"max_tokens\":100}"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "OmniRoute (Direct)",
+      "item": [
+        {
+          "name": "OmniRoute Health",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:20128/"
+          },
+          "response": []
+        },
+        {
+          "name": "OmniRoute Models",
+          "request": {
+            "method": "GET",
+            "url": "http://localhost:20128/v1/models"
+          },
+          "response": []
+        },
+        {
+          "name": "OmniRoute Chat Auto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "url": "http://localhost:20128/v1/chat/completions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"model\":\"auto\",\"messages\":[{\"role\":\"user\",\"content\":\"test\"}],\"max_tokens\":10}"
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

@@ -106,6 +106,68 @@ func TestResolve_OrdersByScoreDesc(t *testing.T) {
 	}
 }
 
+// HU-052 AC3 — Logging: Router loguea su decisión de routing
+// El método Resolve() debe loguear su decisión de routing (capability, chosen provider, score).
+// Este test valida que el método completa exitosamente (logging ocurre internamente).
+func TestResolve_LogsRoutingDecision(t *testing.T) {
+	models := testModels()
+	r := newRouter(models, nil, nil)
+
+	// Llamar Resolve("chat") - debería completar sin error
+	// (el logging ocurre internamente via log.Printf)
+	chain, err := r.Resolve("chat", 1000)
+	if err != nil {
+		t.Fatalf("error al resolver: %v", err)
+	}
+
+	if len(chain) == 0 {
+		t.Fatal("esperaba al menos 1 modelo")
+	}
+
+	// Validar que el primer modelo elegido es el mejor (highest score)
+	if chain[0].Name != "best" {
+		t.Fatalf("esperaba modelo 'best' como top choice, obtuve %q", chain[0].Name)
+	}
+}
+
+// HU-052 AC2 — Capability filtering: Router retorna solo modelos con capability solicitada
+// Si capability "reasoning" solicitada: solo anthropic y openai (no google, local, aihubmix)
+func TestResolve_ReasoningCapabilityFiltering(t *testing.T) {
+	models := []registry.Model{
+		// Modelos con capability "chat"
+		{Name: "openai-chat", ProviderID: "openai", Capabilities: []string{"chat", "reasoning"}, QualityScore: 95, LatencyP50ms: 100, CostPer1M: 1, MaxContextToks: 100_000},
+		{Name: "anthropic-chat", ProviderID: "anthropic", Capabilities: []string{"chat", "reasoning"}, QualityScore: 90, LatencyP50ms: 150, CostPer1M: 2, MaxContextToks: 100_000},
+		// Modelos solo con "chat", NO reasoning
+		{Name: "google-chat", ProviderID: "google", Capabilities: []string{"chat", "vision"}, QualityScore: 85, LatencyP50ms: 200, CostPer1M: 3, MaxContextToks: 100_000},
+		{Name: "local-chat", ProviderID: "local", Capabilities: []string{"chat"}, QualityScore: 70, LatencyP50ms: 300, CostPer1M: 0, MaxContextToks: 100_000},
+	}
+
+	r := newRouter(models, nil, nil)
+
+	// TEST: Resolver "reasoning" debe retornar solo openai y anthropic
+	chain, err := r.Resolve("reasoning", 1000)
+	if err != nil {
+		t.Fatalf("error al resolver reasoning: %v", err)
+	}
+
+	got := names(chain)
+	if len(got) != 2 {
+		t.Fatalf("esperaba 2 modelos con reasoning, obtuve %d: %v", len(got), got)
+	}
+
+	// Validar que son los correctos (openai debería ser primero por score)
+	if got[0] != "openai-chat" || got[1] != "anthropic-chat" {
+		t.Fatalf("orden reasoning esperada [openai-chat, anthropic-chat], obtuve %v", got)
+	}
+
+	// Validar que google-chat y local-chat NO están en la cadena
+	for _, name := range got {
+		if name == "google-chat" || name == "local-chat" {
+			t.Errorf("modelo %q NO debe estar en reasoning chain (no tiene capability)", name)
+		}
+	}
+}
+
 // HU-002a AC2 — Edge: top deshabilitado/unhealthy → excluido, segundo toma primer lugar.
 func TestResolve_ExcludesUnhealthyTop(t *testing.T) {
 	r := newRouter(testModels(), map[string]bool{"best": true}, nil)

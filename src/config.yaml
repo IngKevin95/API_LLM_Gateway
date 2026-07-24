@@ -1,4 +1,4 @@
-# config.yaml — API LLM Gateway (ejemplo de arranque, subconjunto del Anexo A del PRD técnico)
+# config.yaml — API LLM Gateway (MVP Fase 1 con adaptadores implementados)
 # Secretos siempre por referencia de entorno ${VAR}, nunca literales.
 
 providers:
@@ -28,7 +28,7 @@ providers:
         cost_per_1m_tokens: 20
         max_context_tokens: 200000
 
-  - id: local-ollama
+  - id: local
     type: ollama
     base_url: http://localhost:11434
     max_in_flight: 50
@@ -40,17 +40,55 @@ providers:
         cost_per_1m_tokens: 0
         max_context_tokens: 32000
 
+  - id: google
+    type: google
+    base_url: https://generativelanguage.googleapis.com/v1beta
+    api_key: ${GOOGLE_API_KEY}
+    max_in_flight: 200
+    models:
+      - name: gemini-1.5-flash
+        capabilities: [chat, vision]
+        quality_score: 80
+        latency_p50_ms: 600
+        cost_per_1m_tokens: 0.075
+        max_context_tokens: 1000000
+
+  - id: aihubmix
+    type: openai-compatible
+    base_url: https://api.aihubmix.com/v1
+    api_key: ${AIHUBMIX_API_KEY}
+    max_in_flight: 100
+    models:
+      - name: gpt-3.5-turbo
+        capabilities: [chat]
+        quality_score: 75
+        latency_p50_ms: 700
+        cost_per_1m_tokens: 0.03
+        max_context_tokens: 4096
+
+  - id: omniroute
+    type: openai-compatible
+    base_url: http://omniroute:20128/v1
+    max_in_flight: 100
+    models:
+      - name: gpt-3.5-turbo
+        capabilities: [chat, coding]
+        quality_score: 65
+        latency_p50_ms: 150
+        cost_per_1m_tokens: 0
+        max_context_tokens: 4096
+
 routing:
   capabilities:
     chat:
-      providers: [openai, anthropic, local-ollama]
+      providers: [omniroute, aihubmix, local, openai, anthropic, google]
       stream_idle_timeout_ms: 5000
     reasoning:
       providers: [anthropic, openai]
       stream_idle_timeout_ms: 60000
     vision:
-      providers: [openai, anthropic]
+      providers: [google, openai, anthropic]
       stream_idle_timeout_ms: 10000
     coding:
-      providers: [local-ollama]
+      providers: [local, anthropic]
       stream_idle_timeout_ms: 5000

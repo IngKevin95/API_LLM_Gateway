@@ -45,7 +45,8 @@ func TestIntegration_QuotaFailover(t *testing.T) {
 	// Set quota for all providers.
 	qm.SetLimit("openai", quota.Consumption{Tokens: 1000, Requests: 10})
 	qm.SetLimit("anthropic", quota.Consumption{Tokens: 1000, Requests: 10})
-	qm.SetLimit("local-ollama", quota.Consumption{Tokens: 1000, Requests: 10})
+	qm.SetLimit("local", quota.Consumption{Tokens: 1000, Requests: 10})
+	qm.SetLimit("omniroute", quota.Consumption{Tokens: 1000, Requests: 10})
 
 	// Inject QuotaManager into the Router as well (so Router knows if global provider quota is exhausted).
 	// Currently quota manager's Remaining() just takes a key, which corresponds to the provider in this test.
