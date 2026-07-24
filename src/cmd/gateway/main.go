@@ -98,8 +98,10 @@ func main() {
 		// Build Router (EP-001) con Health/Quota reales en vez de los stubs estáticos.
 		rt := router.New(reg, hm, qm, tokenizer.NewHeuristic())
 
-		// Build Adapters (EP-002, EP-008, EP-EVO-001)
-		adapters := buildAdapters(reg)
+		// Build Adapters (EP-002, EP-008, EP-EVO-001), envueltos por el
+		// Quota Middleware (HU-EVO-006/007/009) para aprender cuota real
+		// desde los headers de respuesta e imponer reserva/commit por proveedor.
+		adapters := wrapWithQuotaMiddleware(buildAdapters(reg), qm)
 
 		// Build Failover Engine (EP-002); RetireOn429 se conecta al recibir 429s.
 		fe := failover.New(rt, adapters)
@@ -202,6 +204,20 @@ func main() {
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Printf("shutdown: %v", err)
 	}
+}
+
+// wrapWithQuotaMiddleware envuelve cada adapter con quota.Middleware
+// (HU-EVO-006/007/009): intercepta Chat/Embed para reservar/confirmar
+// consumo y aprender QuotaInfo real de los headers de respuesta hacia el
+// Manager compartido con el Router (para que la penalización por cuota baja
+// de scoreAll opere sobre datos aprendidos en runtime, no solo el hint
+// estático del Registry).
+func wrapWithQuotaMiddleware(adapters map[string]adapter.Adapter, qm quota.Manager) map[string]adapter.Adapter {
+	wrapped := make(map[string]adapter.Adapter, len(adapters))
+	for providerID, ad := range adapters {
+		wrapped[providerID] = quota.NewMiddleware(qm, providerID, ad)
+	}
+	return wrapped
 }
 
 // buildAdapters constructs and returns adapters for all configured providers.
