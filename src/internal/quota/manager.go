@@ -39,6 +39,50 @@ func NewInMemoryManagerWithClock(clock func() time.Time) *inMemoryManager {
 	}
 }
 
+// DefaultQuotaHint es la cuota inicial asumida cuando un proveedor no declara
+// quota_hint en YAML (HU-EVO-005 AC4): 1M, un piso conservador de free tier.
+const DefaultQuotaHint = 1_000_000
+
+// InitFromRegistry inicializa `remaining` por proveedor desde quota_hint
+// (HU-EVO-005 AC1/AC3/AC4). hints es providerID -> *quota_hint (nil = ausente
+// en YAML -> aplica DefaultQuotaHint; <=0 -> se trata como agotado, remaining=0).
+// Solo inicializa providers que aún no tengan estado (no pisa un valor ya
+// aprendido en runtime o restaurado desde persistencia, AC2/AC5).
+func (m *inMemoryManager) InitFromRegistry(hints map[string]*int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for id, hint := range hints {
+		if _, exists := m.states[id]; exists {
+			continue // ya inicializado (ej. restaurado desde PostgreSQL, AC5)
+		}
+		quota := DefaultQuotaHint
+		if hint != nil {
+			if *hint <= 0 {
+				quota = 0 // AC3: quota_hint <=0 -> agotado
+			} else {
+				quota = *hint
+			}
+		}
+		m.states[id] = &providerState{
+			limit:  Consumption{Tokens: quota},
+			window: currentWindow(m.clock()),
+		}
+	}
+}
+
+// RestoreRemaining fija `remaining` para providerID a un valor restaurado
+// desde persistencia (ej. PostgreSQL en boot), con precedencia sobre
+// quota_hint y sobre cualquier init previo (HU-EVO-005 AC5). Debe llamarse
+// antes de InitFromRegistry para que este último respete el valor restaurado.
+func (m *inMemoryManager) RestoreRemaining(providerID string, remaining int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.states[providerID] = &providerState{
+		limit:  Consumption{Tokens: remaining},
+		window: currentWindow(m.clock()),
+	}
+}
+
 func (m *inMemoryManager) SetLimit(providerID string, limit Consumption) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
