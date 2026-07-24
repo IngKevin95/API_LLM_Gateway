@@ -82,9 +82,32 @@ func main() {
 			log.Fatalf("registry: GATEWAY_FREETIER_CONFIG=%s no encontrado: %v", freeTierPath, statErr)
 		}
 
-		// HU-EVO-005: Quota Manager inicializado desde los quota_hint del Registry
-		// (incluye los proveedores free-tier recién mergeados).
+		// HU-EVO-008: Persister real a PostgreSQL, opt-in vía
+		// GATEWAY_QUOTA_POSTGRES_DSN. Si no está declarado, sigue usando
+		// NoPersister (no-op) — comportamiento sin cambios. Si está declarado
+		// pero la conexión falla, se loguea warning y se sigue solo con
+		// memoria (AC3: la persistencia nunca debe tumbar el boot).
 		qm := quota.NewInMemoryManager()
+		if dsn := os.Getenv("GATEWAY_QUOTA_POSTGRES_DSN"); dsn != "" {
+			pgPersister, err := quota.NewPostgresPersister(dsn, 1000)
+			if err != nil {
+				log.Printf("WARN gateway: quota postgres persister no disponible, sigue solo en RAM: %v", err)
+			} else {
+				qm = quota.NewInMemoryManagerWithPersister(time.Now, pgPersister)
+				if restored, err := pgPersister.LoadRemaining(context.Background()); err != nil {
+					log.Printf("WARN gateway: quota postgres LoadRemaining falló, arranca sin restaurar: %v", err)
+				} else {
+					for providerID, remaining := range restored {
+						qm.RestoreRemaining(providerID, int(remaining)) // AC5: precedencia sobre quota_hint
+					}
+					log.Printf("INFO gateway: quota restaurada desde PostgreSQL para %d proveedor(es)", len(restored))
+				}
+			}
+		}
+
+		// HU-EVO-005: Quota Manager inicializado desde los quota_hint del Registry
+		// (incluye los proveedores free-tier recién mergeados). InitFromRegistry
+		// no pisa estado ya restaurado desde el persister (AC5).
 		qm.InitFromRegistry(reg.QuotaHints())
 
 		// HU-EVO-004: Health Monitor real; RetireOn429 lo invoca el Failover al
@@ -98,8 +121,10 @@ func main() {
 		// Build Router (EP-001) con Health/Quota reales en vez de los stubs estáticos.
 		rt := router.New(reg, hm, qm, tokenizer.NewHeuristic())
 
-		// Build Adapters (EP-002, EP-008, EP-EVO-001)
-		adapters := buildAdapters(reg)
+		// Build Adapters (EP-002, EP-008, EP-EVO-001), envueltos por el
+		// Quota Middleware (HU-EVO-006/007/009) para aprender cuota real
+		// desde los headers de respuesta e imponer reserva/commit por proveedor.
+		adapters := wrapWithQuotaMiddleware(buildAdapters(reg), qm)
 
 		// Build Failover Engine (EP-002); RetireOn429 se conecta al recibir 429s.
 		fe := failover.New(rt, adapters)
@@ -202,6 +227,20 @@ func main() {
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Printf("shutdown: %v", err)
 	}
+}
+
+// wrapWithQuotaMiddleware envuelve cada adapter con quota.Middleware
+// (HU-EVO-006/007/009): intercepta Chat/Embed para reservar/confirmar
+// consumo y aprender QuotaInfo real de los headers de respuesta hacia el
+// Manager compartido con el Router (para que la penalización por cuota baja
+// de scoreAll opere sobre datos aprendidos en runtime, no solo el hint
+// estático del Registry).
+func wrapWithQuotaMiddleware(adapters map[string]adapter.Adapter, qm quota.Manager) map[string]adapter.Adapter {
+	wrapped := make(map[string]adapter.Adapter, len(adapters))
+	for providerID, ad := range adapters {
+		wrapped[providerID] = quota.NewMiddleware(qm, providerID, ad)
+	}
+	return wrapped
 }
 
 // buildAdapters constructs and returns adapters for all configured providers.

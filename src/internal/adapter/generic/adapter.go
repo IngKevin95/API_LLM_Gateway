@@ -150,6 +150,7 @@ func (a *Adapter) chatOpenAI(ctx context.Context, req adapter.Request) (adapter.
 	if perr := a.checkStatus(resp); perr != nil {
 		return adapter.Response{}, perr
 	}
+	quotaInfo := adapter.ExtractQuota(resp.Header)
 	var cr ochatResponse
 	if err := json.NewDecoder(resp.Body).Decode(&cr); err != nil {
 		return adapter.Response{}, a.protocolError(err)
@@ -157,7 +158,7 @@ func (a *Adapter) chatOpenAI(ctx context.Context, req adapter.Request) (adapter.
 	if len(cr.Choices) == 0 {
 		return adapter.Response{}, a.protocolError(errors.New("respuesta sin choices"))
 	}
-	return adapter.Response{Content: cr.Choices[0].Message.Content}, nil
+	return adapter.Response{Content: cr.Choices[0].Message.Content, QuotaInfo: quotaInfo}, nil
 }
 
 func (a *Adapter) chatClaude(ctx context.Context, req adapter.Request) (adapter.Response, error) {
@@ -170,11 +171,12 @@ func (a *Adapter) chatClaude(ctx context.Context, req adapter.Request) (adapter.
 	if perr := a.checkStatus(resp); perr != nil {
 		return adapter.Response{}, perr
 	}
+	quotaInfo := adapter.ExtractQuota(resp.Header)
 	var mr cmessagesResponse
 	if err := json.NewDecoder(resp.Body).Decode(&mr); err != nil {
 		return adapter.Response{}, a.protocolError(err)
 	}
-	var out adapter.Response
+	out := adapter.Response{QuotaInfo: quotaInfo}
 	for _, c := range mr.Content {
 		if c.Type == "text" {
 			out.Content += c.Text
@@ -279,18 +281,36 @@ func (a *Adapter) checkStatus(resp *http.Response) *adapter.ProviderError {
 	}
 }
 
-// parseRetryAfter interpreta el header Retry-After como segundos (formato
-// delta-seconds, el único usado por los proveedores free-tier curados).
-// Devuelve 0 si el header está vacío o no es un entero de segundos válido.
+// parseRetryAfter interpreta el header Retry-After en sus dos formatos válidos
+// por RFC 7231 §7.1.3: delta-seconds (el usado por los proveedores free-tier
+// curados) o fecha HTTP RFC1123 (HU-EVO-0010 AC2). Devuelve 0 si el header
+// está vacío o no matchea ninguno de los dos formatos.
 func parseRetryAfter(header string) time.Duration {
-	if header == "" {
+	return parseRetryAfterAt(header, time.Now)
+}
+
+// parseRetryAfterAt es la versión testeable de parseRetryAfter: recibe la
+// función "now" para poder fijar el reloj en tests deterministas al calcular
+// el delta contra una fecha RFC1123.
+func parseRetryAfterAt(header string, now func() time.Time) time.Duration {
+	trimmed := strings.TrimSpace(header)
+	if trimmed == "" {
 		return 0
 	}
-	secs, err := strconv.Atoi(strings.TrimSpace(header))
-	if err != nil || secs < 0 {
-		return 0
+	if secs, err := strconv.Atoi(trimmed); err == nil {
+		if secs < 0 {
+			return 0
+		}
+		return time.Duration(secs) * time.Second
 	}
-	return time.Duration(secs) * time.Second
+	if t, err := time.Parse(time.RFC1123, trimmed); err == nil {
+		d := t.Sub(now())
+		if d < 0 {
+			return 0
+		}
+		return d
+	}
+	return 0
 }
 
 func (a *Adapter) protocolError(err error) *adapter.ProviderError {

@@ -2,122 +2,86 @@ package router
 
 import (
 	"testing"
+
+	"api-llm-gateway/internal/registry"
+	"api-llm-gateway/internal/tokenizer"
 )
 
-// RED: Test failing for HU-EVO-009 AC1 - Penalización when remaining < 20%
-func TestScore_Penalization_WhenRemainingLow(t *testing.T) {
-	// Arrange: mock quota manager that returns low remaining
-	qm := &MockQuotaManager{
-		remaining: map[string]int{
-			"openai": 15,  // 15% of 100 limit
-			"groq":   80,  // 80% of 100 limit
-		},
-		limit: map[string]int{
-			"openai": 100,
-			"groq":   100,
-		},
-	}
+// perModelQuota satisface QuotaSource devolviendo un remaining distinto por
+// modelo, para poder ejercitar scoreAll() (el código real de producción,
+// router.go:161-167) en vez de reimplementar Score() en el test.
+type perModelQuota struct{ remaining map[string]int }
 
-	router := NewRouterWithQuota(qm)
+func (q perModelQuota) Remaining(_, model string) int { return q.remaining[model] }
 
-	// Act: score models with low and high quota
-	scoreOpenAI := router.Score("openai", "gpt-4")
-	scoreGroq := router.Score("groq", "mixtral")
-
-	// Assert: openai score penalized (remaining 15 < 20% of 100)
-	// groq score not penalized (remaining 80 > 20% of 100)
-	// Both scores positive, but openai < groq
-	if scoreOpenAI >= scoreGroq {
-		t.Errorf("Expected openai (low quota) score <= groq (high quota), got %d vs %d",
-			scoreOpenAI, scoreGroq)
+// modelos idénticos en calidad/latencia/costo: la única variable que puede
+// explicar una diferencia de score es la penalización por cuota baja.
+func penaltyTestModels() []registry.Model {
+	return []registry.Model{
+		{Name: "low-quota", ProviderID: "openai", Capabilities: []string{"chat"}, QualityScore: 80, LatencyP50ms: 300, CostPer1M: 10},
+		{Name: "high-quota", ProviderID: "groq", Capabilities: []string{"chat"}, QualityScore: 80, LatencyP50ms: 300, CostPer1M: 10},
 	}
 }
 
-// RED: Test failing for HU-EVO-009 AC2 - No penalization when remaining > 20%
-func TestScore_NoPenalization_WhenRemainingHigh(t *testing.T) {
-	qm := &MockQuotaManager{
-		remaining: map[string]int{
-			"openai": 25, // 25% of 100 limit
-		},
-		limit: map[string]int{
-			"openai": 100,
-		},
+// HU-EVO-009 AC1 (reapertura) — remaining < 20% del máximo entre candidatos
+// penaliza el score real de scoreAll(); el test anterior (score_penalty_test.go
+// original) reimplementaba Score() en un stub que nunca tocaba router.go.
+func TestScoreAll_PenalizesLowRemainingQuota(t *testing.T) {
+	models := penaltyTestModels()
+	r := New(stubSource{models: models}, allHealthy{}, perModelQuota{remaining: map[string]int{
+		"low-quota":  15,  // 15% del máximo (100) -> por debajo del umbral 20%
+		"high-quota": 100, // máximo -> sin penalización
+	}}, tokenizer.NewHeuristic())
+
+	scores := r.scoreAll(models)
+
+	if scores["low-quota"] >= scores["high-quota"] {
+		t.Fatalf("esperaba low-quota penalizado por debajo de high-quota, obtuve low=%.4f high=%.4f",
+			scores["low-quota"], scores["high-quota"])
 	}
-
-	router := NewRouterWithQuota(qm)
-	score := router.Score("openai", "gpt-4")
-
-	// Assert: score should be positive (no penalization at exactly 25%)
-	if score <= 0 {
-		t.Errorf("Expected positive score for 25%% remaining, got %d", score)
-	}
-}
-
-// RED: Test failing for HU-EVO-009 AC3 - Exhausted provider highly penalized
-func TestScore_Exhausted_HighlyPenalized(t *testing.T) {
-	qm := &MockQuotaManager{
-		remaining: map[string]int{
-			"openai":  0,   // exhausted
-			"groq":    100, // full
-		},
-		limit: map[string]int{
-			"openai": 100,
-			"groq":   100,
-		},
-	}
-
-	router := NewRouterWithQuota(qm)
-	scoreOpenAI := router.Score("openai", "gpt-4")
-	scoreGroq := router.Score("groq", "mixtral")
-
-	// Assert: exhausted provider significantly penalized vs full provider
-	if scoreOpenAI >= scoreGroq {
-		t.Errorf("Expected exhausted provider (0 remaining) score < full provider, got %d vs %d",
-			scoreOpenAI, scoreGroq)
+	// La penalización es -wPenalty*1.0 = -0.20 exacto sobre el score de
+	// low-quota respecto de si no hubiera penalización (remaining=quMax).
+	unpenalized := r.scoreAll([]registry.Model{
+		{Name: "low-quota", ProviderID: "openai", Capabilities: []string{"chat"}, QualityScore: 80, LatencyP50ms: 300, CostPer1M: 10},
+	})
+	// Con un solo candidato, quMax==quMin==remaining -> norm=1, sin penalización
+	// (remaining >= threshold porque threshold = quMax*0.2 = remaining*0.2 < remaining).
+	if unpenalized["low-quota"]-scores["low-quota"] < 0.15 {
+		t.Errorf("delta de penalización esperado >= wPenalty(0.20) aprox, obtuve %.4f", unpenalized["low-quota"]-scores["low-quota"])
 	}
 }
 
-// Test helper
-type MockQuotaManager struct {
-	remaining map[string]int
-	limit     map[string]int
-}
+// HU-EVO-009 AC2 (reapertura) — remaining exactamente en el umbral (20% del
+// máximo) NO se penaliza (comparación estricta "<" en router.go:165).
+func TestScoreAll_NoPenalization_AtExactThreshold(t *testing.T) {
+	models := penaltyTestModels()
+	r := New(stubSource{models: models}, allHealthy{}, perModelQuota{remaining: map[string]int{
+		"low-quota":  20,  // exactamente 20% de 100 -> NO penalizado (threshold = 20, 20 < 20 es falso)
+		"high-quota": 100,
+	}}, tokenizer.NewHeuristic())
 
-func (m *MockQuotaManager) Reserve(providerID string, estimate interface{}) bool {
-	return m.remaining[providerID] > 0
-}
-
-func (m *MockQuotaManager) Commit(providerID string, estimate interface{}, actual interface{}) error {
-	return nil
-}
-
-func (m *MockQuotaManager) Remaining(providerID, modelID string) int {
-	return m.remaining[providerID]
-}
-
-func (m *MockQuotaManager) LearnFromHeaders(providerID, modelID string, quota interface{}) {
-}
-
-// Stub Router for testing
-func NewRouterWithQuota(qm interface{}) *StubRouterWithQuota {
-	return &StubRouterWithQuota{quotaManager: qm}
-}
-
-type StubRouterWithQuota struct {
-	quotaManager interface{}
-}
-
-func (r *StubRouterWithQuota) Score(providerID, modelID string) int {
-	qm := r.quotaManager.(*MockQuotaManager)
-	baseScore := 100
-
-	// Apply penalization if remaining < 20% of limit
-	remaining := qm.Remaining(providerID, "")
-	limit := qm.limit[providerID]
-
-	if remaining < (limit / 5) { // remaining < 20% of limit
-		baseScore = baseScore / 2 // 50% penalty
+	scores := r.scoreAll(models)
+	// Sin penalización, low-quota solo pierde por el eje quota (quotaN menor),
+	// nunca por el bloque completo de wPenalty=0.20.
+	quotaOnlyDelta := wQuota * 1.0 // peso máximo del eje quota
+	if scores["high-quota"]-scores["low-quota"] > quotaOnlyDelta+0.01 {
+		t.Errorf("diferencia de score excede el eje quota solo (sin penalty): delta=%.4f, esperaba <= %.4f",
+			scores["high-quota"]-scores["low-quota"], quotaOnlyDelta+0.01)
 	}
+}
 
-	return baseScore
+// HU-EVO-009 AC3 (reapertura) — proveedor con remaining=0 recibe la máxima
+// penalización disponible.
+func TestScoreAll_ExhaustedProvider_MaxPenalty(t *testing.T) {
+	models := penaltyTestModels()
+	r := New(stubSource{models: models}, allHealthy{}, perModelQuota{remaining: map[string]int{
+		"low-quota":  0,
+		"high-quota": 100,
+	}}, tokenizer.NewHeuristic())
+
+	scores := r.scoreAll(models)
+	if scores["low-quota"] >= scores["high-quota"] {
+		t.Fatalf("esperaba proveedor agotado (remaining=0) penalizado por debajo, obtuve low=%.4f high=%.4f",
+			scores["low-quota"], scores["high-quota"])
+	}
 }
