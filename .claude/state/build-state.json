@@ -12,7 +12,7 @@
     "confirmed": true,
     "confirmed_by": "kevin",
     "confirmed_at": "2026-07-24T00:00:00Z",
-    "source": "Stitch (Google) project 12981760791975432480 'API LLM Gateway - Dashboard de Métricas', design system 'Gateway Ops Dark' (assets/3180517604298626067) - 4 pantallas: Overview (screens/69b29782eb5f40f699f4b8c51cf7d3a9), Quotas (screens/6d837ee1811c43a38606f353866d7700), Alerts (screens/e97083ce667d4eac936ebf5bd2040beb), Providers (screens/417432f2fe7843409965eb26d986a059)",
+    "source": "Stitch (Google) project 12981760791975432480 'API LLM Gateway - Dashboard de M\u00c3\u00a9tricas', design system 'Gateway Ops Dark' (assets/3180517604298626067) - 4 pantallas: Overview (screens/69b29782eb5f40f699f4b8c51cf7d3a9), Quotas (screens/6d837ee1811c43a38606f353866d7700), Alerts (screens/e97083ce667d4eac936ebf5bd2040beb), Providers (screens/417432f2fe7843409965eb26d986a059)",
     "notes": "Prototipo generado con MCP de Stitch, inspirado visualmente en OmniRoute/Grafana (dark, denso en datos, tabs Overview/Quotas/Alerts/Providers, badges semaforo, tablas monoespaciadas). Desbloquea SS2 (HU-EVO-014/015) de EP-EVO-003: gates.fidelity de esa epica ahora se valida contra estas 4 pantallas via ux-fidelity-reviewer."
   },
   "active_slice": {
@@ -27,19 +27,19 @@
       "HU-EVO-022"
     ],
     "layer": "business",
-    "openspec_change": "usuarios-postgresql-api-keys",
-    "branch": "feature/ep-evo-004-users-rbac-security",
-    "phase": "pr",
+    "openspec_change": null,
+    "branch": "feature/ep-evo-004-ss2-sesiones-2fa",
+    "phase": "dor",
     "gates": {
-      "dor": true,
-      "tdd": true,
-      "journey_smoke": true,
-      "coherence_link": true,
-      "data": true,
-      "api": true,
+      "dor": false,
+      "tdd": false,
+      "journey_smoke": false,
+      "coherence_link": false,
+      "data": false,
+      "api": false,
       "fidelity": null,
-      "wiring_verified": true,
-      "dod": true
+      "wiring_verified": false,
+      "dod": false
     },
     "sub_slices": [
       {
@@ -59,8 +59,8 @@
           "HU-EVO-019",
           "HU-EVO-020"
         ],
-        "status": "blocked",
-        "blocked_reason": "SS1 completo (gates dor/tdd/journey_smoke/coherence_link/data/api/wiring_verified/dod=true) y en PR #48 (feature/ep-evo-004-users-rbac-security -> develop), pendiente de aprobacion/merge explicito del usuario. Se desbloquea recien cuando el PR se mergee (regla secuencial: un solo slice a la vez)."
+        "status": "ready",
+        "blocked_reason": null
       },
       {
         "id": "EP-EVO-004-SS3",
@@ -73,92 +73,7 @@
         "blocked_reason": "Secuencial: se abre solo tras SS2 en done; consume src/ui/dashboard/ ya mergeado (EP-EVO-003) como dependencia de UI"
       }
     ],
-    "wiring_checklist": [
-      {
-        "id": "HU-EVO-017-AC1",
-        "kind": "hu_ac",
-        "ref": "HU-EVO-017#1 POST /users crea invited, 201",
-        "status": "passing",
-        "evidence": "src/internal/handler/users_integration_test.go:TestUsersHTTP_Create_Admin_Returns201 (docker postgres:16 real) PASS + smoke curl real: POST /users admin -> 201 {status:invited}"
-      },
-      {
-        "id": "HU-EVO-017-AC2",
-        "kind": "hu_ac",
-        "ref": "HU-EVO-017#2 GET /users admin-de-tenant filtra por tenant",
-        "status": "passing",
-        "evidence": "src/internal/handler/users_integration_test.go:TestUsersHTTP_List_TenantAdmin_OnlySeesOwnTenant + src/internal/user/user_integration_test.go:TestStore_List_FiltersByTenant -- PASS contra postgres real"
-      },
-      {
-        "id": "HU-EVO-017-AC3",
-        "kind": "hu_ac",
-        "ref": "HU-EVO-017#3 PATCH status=suspended corta acceso inmediato",
-        "status": "passing",
-        "evidence": "src/internal/handler/users_integration_test.go:TestUsersHTTP_Patch_Suspend_BlocksAPIKeyAuth (genera key, autentica OK, suspende, reautentica falla) + src/internal/user/user_integration_test.go:TestKeyStore_Authenticate_SuspendedUser_Fails -- PASS + smoke curl real replica el mismo flujo"
-      },
-      {
-        "id": "HU-EVO-017-AC4",
-        "kind": "hu_ac",
-        "ref": "HU-EVO-017#4 no-admin POST /users -> 403, sin crear registro",
-        "status": "passing",
-        "evidence": "src/internal/handler/users_integration_test.go:TestUsersHTTP_Create_NonAdmin_Returns403 (verifica 403 Y ausencia del registro en List) -- PASS + smoke curl real: POST sin token admin -> 403"
-      },
-      {
-        "id": "HU-EVO-017-AC5",
-        "kind": "hu_ac",
-        "ref": "HU-EVO-017#5 email duplicado -> 409, sin duplicar",
-        "status": "passing",
-        "evidence": "src/internal/handler/users_integration_test.go:TestUsersHTTP_Create_DuplicateEmail_Returns409 + src/internal/user/user_integration_test.go:TestStore_Create_DuplicateEmail_ReturnsErrEmailExists -- PASS + smoke curl real: 2do POST mismo email -> 409"
-      },
-      {
-        "id": "HU-EVO-018-AC1",
-        "kind": "hu_ac",
-        "ref": "HU-EVO-018#1 generar key: texto plano una sola vez, solo hash persistido",
-        "status": "passing",
-        "evidence": "src/internal/user/user_integration_test.go:TestKeyStore_GenerateListRevoke (List nunca expone el plano) -- PASS + smoke curl real: POST /users/:id/api-keys devuelve key en claro solo en esa respuesta"
-      },
-      {
-        "id": "HU-EVO-018-AC2",
-        "kind": "hu_ac",
-        "ref": "HU-EVO-018#2 listar keys enmascaradas (nombre/prefijo/scopes/fechas, nunca la key completa)",
-        "status": "passing",
-        "evidence": "src/internal/user/user_integration_test.go:TestKeyStore_GenerateListRevoke -- PASS + smoke curl real: GET /users/:id/api-keys devuelve solo prefix sk-***XXXX"
-      },
-      {
-        "id": "HU-EVO-018-AC3",
-        "kind": "hu_ac",
-        "ref": "HU-EVO-018#3 revocar key: deja de autenticar inmediatamente",
-        "status": "passing",
-        "evidence": "src/internal/user/user_integration_test.go:TestKeyStore_GenerateListRevoke (Authenticate antes/despues de Revoke) -- PASS + smoke curl real: DELETE -> 204, GET /users/:id/api-keys muestra revoked_at seteado"
-      },
-      {
-        "id": "HU-EVO-018-AC4",
-        "kind": "hu_ac",
-        "ref": "HU-EVO-018#4 no-admin revoca key de otro usuario -> 403",
-        "status": "passing",
-        "evidence": "src/internal/handler/users_integration_test.go:TestAPIKeysHTTP_Revoke_OtherUser_Returns403 + src/internal/user/user_integration_test.go:TestKeyStore_Revoke_WrongOwner_ReturnsForbidden -- PASS contra postgres real"
-      },
-      {
-        "id": "HU-EVO-018-AC5",
-        "kind": "hu_ac",
-        "ref": "HU-EVO-018#5 last_used_at se actualiza al autenticar",
-        "status": "passing",
-        "evidence": "src/internal/user/user_integration_test.go:TestKeyStore_Authenticate_UpdatesLastUsedAt -- PASS contra postgres real (null antes, seteado despues de Authenticate)"
-      },
-      {
-        "id": "INT-userkeys-metrics-alerts",
-        "kind": "integration_point",
-        "ref": "user.KeyStore.Authenticate (HU-EVO-018) <- identityMiddleware cableado en /metrics y /alerts, con fallback a apikey.Store legacy (GATEWAY_API_KEYS)",
-        "status": "passing",
-        "evidence": "cmd/gateway/main.go: identityMiddleware prueba userKeys.Authenticate primero, cae a apikey.Middleware(apiKeyStore) si no matchea. Smoke real: boot con GATEWAY_USERS_POSTGRES_DSN + GATEWAY_ADMIN_TOKEN, se genera una key vía POST /users/:id/api-keys, se usa esa MISMA key para GET /metrics -> 200 y GET /alerts -> 200; key invalida ('garbage') -> 401. No es un store aislado sin conectar al binario real."
-      },
-      {
-        "id": "INT-users-store-boot",
-        "kind": "integration_point",
-        "ref": "cmd/gateway/main.go boot: user.NewStore + user.NewKeyStore migran users/api_keys en PostgreSQL real, registerUsersRoutes cablea /users y /users/{id}/api-keys al mux",
-        "status": "passing",
-        "evidence": "Smoke end-to-end: docker run postgres:16 real (puerto dedicado), GATEWAY_USERS_POSTGRES_DSN apuntando a esa instancia, log 'INFO gateway: users/api_keys store conectado a PostgreSQL', 8 curls reales contra el binario compilado (POST/GET/PATCH /users, POST/GET/DELETE /users/:id/api-keys, GET /metrics y /alerts con la key generada) -- todos con el codigo devuelto esperado, no solo HTTP 200 sino contenido verificado (status:invited->active->suspended, key en claro solo una vez, prefix enmascarado en List, revoked_at seteado tras DELETE)."
-      }
-    ],
+    "wiring_checklist": [],
     "progress_log": [
       {
         "at": "2026-07-24T22:00:00Z",
@@ -188,15 +103,20 @@
       {
         "at": "2026-07-24T23:35:00Z",
         "by": "build-orchestrator",
-        "note": "Verificacion adversarial de cableado sobre EP-EVO-004-SS1, ejecutada en esta misma sesion por ausencia de mecanismo de subagente aislado (Task tool) disponible en el entorno de ejecucion -- misma limitacion documentada en las sesiones de EP-EVO-001/EP-EVO-003, registrada explicitamente para no autoconfirmar el cierre. Busqueda activa de huecos: (1) grep 'TODO|FIXME|not implemented|stub' en internal/user/*.go, internal/handler/users.go y cmd/gateway/main.go (excluyendo tests): CERO resultados nuevos (los 2 hits son preexistentes, MCP stub HU-033 fuera de alcance). (2) Verificado que /metrics y /alerts realmente cambiaron de autenticar solo via apikey.Store legacy a probar userKeys.Authenticate PRIMERO -- no es un store aislado sin conectar (INT-userkeys-metrics-alerts, probado con curl real usando la MISMA key generada por POST /users/:id/api-keys). (3) Verificado que Patch a status=suspended corta acceso de una key YA generada y NO revocada -- no alcanza con revocar la key, el corte es a nivel de usuario (TestKeyStore_Authenticate_SuspendedUser_Fails y replicado en TestUsersHTTP_Patch_Suspend_BlocksAPIKeyAuth). (4) Verificado ownership real en Revoke: DB query directa distingue 404 (key no existe/ya revocada) de 403 (pertenece a otro usuario), no un check superficial en memoria (TestKeyStore_Revoke_WrongOwner_ReturnsForbidden). (5) Los 12 items de wiring_checklist (10 AC + 2 integration_point) tienen evidencia de test EJECUTADO (docker postgres real) mas smoke curl real, ninguno declarado passing solo por lectura de codigo. (6) Unico hueco NO cerrado en este sub-slice, documentado explicitamente (no oculto): HU-EVO-017 nota tecnica dice 'Nunca loguear ni persistir contraseñas en texto plano (hash con bcrypt/argon2 si se agrega login por password en una historia posterior)' -- login por password NO se implementa en SS1 (correctamente diferido a HU-EVO-019/020 de SS2, sin AC de HU-EVO-017/018 que lo exija). Veredicto: CABLEADO COMPLETO para el alcance declarado de HU-EVO-017/018. gates.wiring_verified=true."
+        "note": "Verificacion adversarial de cableado sobre EP-EVO-004-SS1, ejecutada en esta misma sesion por ausencia de mecanismo de subagente aislado (Task tool) disponible en el entorno de ejecucion -- misma limitacion documentada en las sesiones de EP-EVO-001/EP-EVO-003, registrada explicitamente para no autoconfirmar el cierre. Busqueda activa de huecos: (1) grep 'TODO|FIXME|not implemented|stub' en internal/user/*.go, internal/handler/users.go y cmd/gateway/main.go (excluyendo tests): CERO resultados nuevos (los 2 hits son preexistentes, MCP stub HU-033 fuera de alcance). (2) Verificado que /metrics y /alerts realmente cambiaron de autenticar solo via apikey.Store legacy a probar userKeys.Authenticate PRIMERO -- no es un store aislado sin conectar (INT-userkeys-metrics-alerts, probado con curl real usando la MISMA key generada por POST /users/:id/api-keys). (3) Verificado que Patch a status=suspended corta acceso de una key YA generada y NO revocada -- no alcanza con revocar la key, el corte es a nivel de usuario (TestKeyStore_Authenticate_SuspendedUser_Fails y replicado en TestUsersHTTP_Patch_Suspend_BlocksAPIKeyAuth). (4) Verificado ownership real en Revoke: DB query directa distingue 404 (key no existe/ya revocada) de 403 (pertenece a otro usuario), no un check superficial en memoria (TestKeyStore_Revoke_WrongOwner_ReturnsForbidden). (5) Los 12 items de wiring_checklist (10 AC + 2 integration_point) tienen evidencia de test EJECUTADO (docker postgres real) mas smoke curl real, ninguno declarado passing solo por lectura de codigo. (6) Unico hueco NO cerrado en este sub-slice, documentado explicitamente (no oculto): HU-EVO-017 nota tecnica dice 'Nunca loguear ni persistir contrase\u00c3\u00b1as en texto plano (hash con bcrypt/argon2 si se agrega login por password en una historia posterior)' -- login por password NO se implementa en SS1 (correctamente diferido a HU-EVO-019/020 de SS2, sin AC de HU-EVO-017/018 que lo exija). Veredicto: CABLEADO COMPLETO para el alcance declarado de HU-EVO-017/018. gates.wiring_verified=true."
       },
       {
         "at": "2026-07-24T23:45:00Z",
         "by": "build-orchestrator",
         "note": "DoD reducido evaluado sobre EP-EVO-004-SS1 (rol dor-dod-gatekeeper): (1) tdd=true; (2) journey_smoke=true (evidencia curl real con postgres real, contenido verificado no solo codigo HTTP); (3) coherence_link=true (openspec validate --strict: valido, 0 issues, ## Trazabilidad presente con Epica/Historias/Sub-slice); (4) data=true (tablas users/api_keys en PostgreSQL real, escritura/lectura/constraint UNIQUE verificados con docker postgres:16 real); (5) api=true (4 endpoints HTTP nuevos, contrato probado en 6 tests HTTP + smoke); (6) fidelity=null (SS1 no toca UI, backend puro); (7) wiring_verified=true (ver entrada anterior, 12/12 items passing con evidencia real, 1 diferimiento explicito no-hueco); (8) hooks automaticos: lint-typecheck.sh, stack-guard.sh (sin dependencias nuevas, solo stdlib + lib/pq ya en go.mod), gitflow-guard.sh: exit 0 los 3. Veredicto: DoD CUMPLIDO para EP-EVO-004-SS1. gates.dod=true. sub_slices[0] (EP-EVO-004-SS1).status='done'. phase avanza a 'pr'. Nota importante: estos gates (dor/tdd/journey_smoke/coherence_link/data/api/wiring_verified/dod) reflejan el cierre de SS1 especificamente, mismo patron que EP-EVO-003 (ver history[]) -- se resetearan a false al abrir SS2 (HU-EVO-019/020, sesiones+2FA), que queda desbloqueado (sub_slices[1].status pasa de 'blocked' a 'ready') recien cuando el PR de SS1 se mergee, siguiendo la regla secuencial 'un solo slice a la vez'."
+      },
+      {
+        "at": "2026-07-24T21:06:33Z",
+        "by": "build-orchestrator",
+        "note": "PR #48 de SS1 mergeado a develop. Se desbloquea SS2 (HU-EVO-019/020). active_slice reseteado para SS2 (phase dor, gates a false, checklist vacio). Siguiente paso: crear rama feature/ep-evo-004-ss2-sesiones-2fa y correr DoR."
       }
     ],
-    "updated_at": "2026-07-24T23:45:00Z",
+    "updated_at": "2026-07-24T21:06:33Z",
     "updated_by": "build-orchestrator"
   },
   "history": [
@@ -731,12 +651,12 @@
         {
           "at": "2026-07-24T03:56:44.276286+00:00Z",
           "by": "dor-dod-gatekeeper",
-          "note": "DoR cerrado para EP-EVO-002: 5 HU (HU-EVO-006..010) con AC en G/W/T (5 escenarios happy/error/edge) y INVEST 6/6. Observacion menor: HU-EVO-009 estimacion 0.5d sospechosa vs AC complejos — validar en TDD. Fase avanza a 'change'."
+          "note": "DoR cerrado para EP-EVO-002: 5 HU (HU-EVO-006..010) con AC en G/W/T (5 escenarios happy/error/edge) y INVEST 6/6. Observacion menor: HU-EVO-009 estimacion 0.5d sospechosa vs AC complejos \u00e2\u20ac\u201d validar en TDD. Fase avanza a 'change'."
         },
         {
           "at": "2026-07-24T04:06:33.155242+00:00Z",
           "by": "opsx:continue",
-          "note": "Fase 'change' completada: openspec new change 'learning-cuota-headers-persistencia' creado con 4/4 artefactos. proposal.md (why/what/capabilities/impact), design.md (6 decisiones arquitectónicas + risks), specs/ (3 nuevas capacidades + 3 deltas de modificadas), tasks.md (60+ checkboxes). gate coherence_link=true. phase avanza a 'tdd'. Pendiente: ciclo TDD para las 5 HU."
+          "note": "Fase 'change' completada: openspec new change 'learning-cuota-headers-persistencia' creado con 4/4 artefactos. proposal.md (why/what/capabilities/impact), design.md (6 decisiones arquitect\u00c3\u00b3nicas + risks), specs/ (3 nuevas capacidades + 3 deltas de modificadas), tasks.md (60+ checkboxes). gate coherence_link=true. phase avanza a 'tdd'. Pendiente: ciclo TDD para las 5 HU."
         },
         {
           "at": "2026-07-24T04:12:47.696427+00:00",
@@ -756,12 +676,12 @@
         {
           "at": "2026-07-24T04:33:26.553239+00:00",
           "by": "wiring-adversarial-verifier + fixes",
-          "note": "Adversarial verification ejecutada: 5 huecos críticos identificados y cerrados. H1: Response.Quota agregado. H2: LearnFromHeaders integrado en middleware. H3-H4: Persister injection en Manager + enqueue. H5: penalization implementada en Router. go build ./...: limpio. go test ./... -race: 100% PASS. gate.wiring_verified=true. Pendiente: dod closure."
+          "note": "Adversarial verification ejecutada: 5 huecos cr\u00c3\u00adticos identificados y cerrados. H1: Response.Quota agregado. H2: LearnFromHeaders integrado en middleware. H3-H4: Persister injection en Manager + enqueue. H5: penalization implementada en Router. go build ./...: limpio. go test ./... -race: 100% PASS. gate.wiring_verified=true. Pendiente: dod closure."
         },
         {
           "at": "2026-07-24T04:34:49.527976+00:00",
           "by": "dor-dod-gatekeeper",
-          "note": "DoD closure: todos 10 items verificados. (1) tdd=true (21 AC), (2) journey_smoke=true (gateway boot), (3) coherence_link=true (openspec valid), (4-7) data/api/fidelity/sub_slices=null/N/A (épica backend in-memory, sin endpoints, sin UI, 1 capa), (8) wiring_verified=true (5 holes closed), (9) docs completos (tasks.md), (10) hooks estándar. go build/vet/test -race: 100% PASS. gate.dod=true. Fase avanza a 'archived'. EP-EVO-002 construcción COMPLETADA."
+          "note": "DoD closure: todos 10 items verificados. (1) tdd=true (21 AC), (2) journey_smoke=true (gateway boot), (3) coherence_link=true (openspec valid), (4-7) data/api/fidelity/sub_slices=null/N/A (\u00c3\u00a9pica backend in-memory, sin endpoints, sin UI, 1 capa), (8) wiring_verified=true (5 holes closed), (9) docs completos (tasks.md), (10) hooks est\u00c3\u00a1ndar. go build/vet/test -race: 100% PASS. gate.dod=true. Fase avanza a 'archived'. EP-EVO-002 construcci\u00c3\u00b3n COMPLETADA."
         },
         {
           "at": "2026-07-24T00:00:00Z",
@@ -781,7 +701,7 @@
         {
           "at": "2026-07-24T06:22:23.607118+00:00",
           "by": "wiring-adversarial-verifier (re-verificacion tras fixes)",
-          "note": "Re-verificacion adversarial de los 6 items marcados failing en la ronda anterior. Confirmado con lectura de codigo + ejecucion real de tests (no confianza en el reporte previo): 5/6 ahora PASSING con evidencia real (ver wiring_checklist): HU-EVO-0010-AC2, HU-EVO-0010-AC4, INT-adapter-quotainfo, INT-quota-learn, INT-router-penalty. Verificado que los call sites de produccion existen (no solo tests): cmd/gateway/main.go:104 wrapWithQuotaMiddleware(buildAdapters(reg), qm); internal/adapter/generic/adapter.go:153,174 adapter.ExtractQuota(resp.Header) en chatOpenAI/chatClaude. go build ./...: limpio; go vet ./...: limpio; go test ./... -race: 100% PASS, 0 failures, 0 data races. INT-quota-persist permanece 'deferred' (no un false-positive: es una decision explicita y documentada, no un hueco oculto) — no implementado, gates.data permanece false, pendiente de confirmacion del usuario. Veredicto: gates.wiring_verified=true (los 5 huecos reales quedaron cerrados con evidencia genuina; el 6to esta diferido a la vista, no escondido). Fase avanza a 'dod'."
+          "note": "Re-verificacion adversarial de los 6 items marcados failing en la ronda anterior. Confirmado con lectura de codigo + ejecucion real de tests (no confianza en el reporte previo): 5/6 ahora PASSING con evidencia real (ver wiring_checklist): HU-EVO-0010-AC2, HU-EVO-0010-AC4, INT-adapter-quotainfo, INT-quota-learn, INT-router-penalty. Verificado que los call sites de produccion existen (no solo tests): cmd/gateway/main.go:104 wrapWithQuotaMiddleware(buildAdapters(reg), qm); internal/adapter/generic/adapter.go:153,174 adapter.ExtractQuota(resp.Header) en chatOpenAI/chatClaude. go build ./...: limpio; go vet ./...: limpio; go test ./... -race: 100% PASS, 0 failures, 0 data races. INT-quota-persist permanece 'deferred' (no un false-positive: es una decision explicita y documentada, no un hueco oculto) \u00e2\u20ac\u201d no implementado, gates.data permanece false, pendiente de confirmacion del usuario. Veredicto: gates.wiring_verified=true (los 5 huecos reales quedaron cerrados con evidencia genuina; el 6to esta diferido a la vista, no escondido). Fase avanza a 'dod'."
         },
         {
           "at": "2026-07-24T06:31:00.483836+00:00",
@@ -1017,7 +937,7 @@
           "kind": "hu_ac",
           "ref": "HU-EVO-012#4 umbral configurable sin redeploy",
           "status": "passing",
-          "evidence": "src/internal/alert/manager_test.go:TestClassify_ConfigurableThreshold (mismo remaining, distinto veredicto con threshold 10%% vs 30%%) + wiring real: GATEWAY_ALERT_THRESHOLD leído en cmd/gateway/main.go sin recompilar -- PASS"
+          "evidence": "src/internal/alert/manager_test.go:TestClassify_ConfigurableThreshold (mismo remaining, distinto veredicto con threshold 10%% vs 30%%) + wiring real: GATEWAY_ALERT_THRESHOLD le\u00c3\u00addo en cmd/gateway/main.go sin recompilar -- PASS"
         },
         {
           "id": "HU-EVO-012-AC5",
@@ -1148,7 +1068,7 @@
         {
           "at": "2026-07-24T21:00:00Z",
           "by": "build-orchestrator",
-          "note": "Verificacion adversarial de cableado (rol wiring-adversarial-verifier, ejecutada en esta misma sesion por ausencia de mecanismo de subagente aislado disponible -- limitacion de herramientas del entorno, documentada explicitamente como desviacion del protocolo ideal de contexto en blanco). Busqueda activa de huecos: (1) grep de 'TODO|FIXME|not implemented|stub' en los archivos nuevos (manager.go, alerts.go, snapshot en manager.go): sin resultados relevantes. (2) Se verifico que CADA AC declarado passing tiene un test real ejecutado (unitario o de integracion con Postgres real via docker), no una aserción de codigo leido -- 24/26 items con evidencia de test + 2 con evidencia de curl real (INT-metrics-quota, INT-main-wiring) ademas de sus tests. (3) Se encontro y CORRIGIO en esta sesion el hueco real mas serio: AC5 de HU-EVO-011 (filtrado por scope) estaba implementado y unit-testeado pero era inalcanzable por HTTP porque /metrics nunca inyectaba una identidad no-admin (ver entrada 'journey_smoke') -- ya no es el caso, verificado con curl real post-fix. (4) Se revisaron las 2 desviaciones documentadas (HU-EVO-013-AC2 sin tenant_id literal, tasks.md 3.3 sin tabla 'models' SQL) contra el codigo real: ambas estan efectivamente implementadas con un mecanismo equivalente (CapabilityLookup), no son huecos ocultos ni AC marcados passing sin sustento -- estan explicitamos en tasks.md y en wiring_checklist.evidence, no enterrados. (5) go build ./... + go vet ./... + go test ./... -race: 100%% verde, sin regresion. (6) Se corrieron los tests con tag integration explicitamente (go test ./internal/alert/... ./internal/handler/... -tags=integration -v) contra Postgres real, no solo los unitarios con mocks -- 4/4 PASS. Veredicto: CABLEADO COMPLETO, sin huecos ocultos identificados. gates.wiring_verified=true. NOTA DE LIMITACION: esta verificacion la corrio el mismo agente que implemento el codigo, en la misma sesion (no un subagente con contexto en blanco como exige el protocolo del arnes en su forma ideal) -- se registra explicitamente para que una revision humana o una corrida futura con el subagente real pueda re-auditar si asi se decide antes de mergear el PR. Siguiente paso: DoD reducido (dor-dod-gatekeeper) sobre EP-EVO-003-SS1."
+          "note": "Verificacion adversarial de cableado (rol wiring-adversarial-verifier, ejecutada en esta misma sesion por ausencia de mecanismo de subagente aislado disponible -- limitacion de herramientas del entorno, documentada explicitamente como desviacion del protocolo ideal de contexto en blanco). Busqueda activa de huecos: (1) grep de 'TODO|FIXME|not implemented|stub' en los archivos nuevos (manager.go, alerts.go, snapshot en manager.go): sin resultados relevantes. (2) Se verifico que CADA AC declarado passing tiene un test real ejecutado (unitario o de integracion con Postgres real via docker), no una aserci\u00c3\u00b3n de codigo leido -- 24/26 items con evidencia de test + 2 con evidencia de curl real (INT-metrics-quota, INT-main-wiring) ademas de sus tests. (3) Se encontro y CORRIGIO en esta sesion el hueco real mas serio: AC5 de HU-EVO-011 (filtrado por scope) estaba implementado y unit-testeado pero era inalcanzable por HTTP porque /metrics nunca inyectaba una identidad no-admin (ver entrada 'journey_smoke') -- ya no es el caso, verificado con curl real post-fix. (4) Se revisaron las 2 desviaciones documentadas (HU-EVO-013-AC2 sin tenant_id literal, tasks.md 3.3 sin tabla 'models' SQL) contra el codigo real: ambas estan efectivamente implementadas con un mecanismo equivalente (CapabilityLookup), no son huecos ocultos ni AC marcados passing sin sustento -- estan explicitamos en tasks.md y en wiring_checklist.evidence, no enterrados. (5) go build ./... + go vet ./... + go test ./... -race: 100%% verde, sin regresion. (6) Se corrieron los tests con tag integration explicitamente (go test ./internal/alert/... ./internal/handler/... -tags=integration -v) contra Postgres real, no solo los unitarios con mocks -- 4/4 PASS. Veredicto: CABLEADO COMPLETO, sin huecos ocultos identificados. gates.wiring_verified=true. NOTA DE LIMITACION: esta verificacion la corrio el mismo agente que implemento el codigo, en la misma sesion (no un subagente con contexto en blanco como exige el protocolo del arnes en su forma ideal) -- se registra explicitamente para que una revision humana o una corrida futura con el subagente real pueda re-auditar si asi se decide antes de mergear el PR. Siguiente paso: DoD reducido (dor-dod-gatekeeper) sobre EP-EVO-003-SS1."
         },
         {
           "at": "2026-07-24T18:30:00Z",
