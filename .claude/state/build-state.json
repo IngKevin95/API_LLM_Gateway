@@ -1117,5 +1117,20 @@
       "status": "done"
     }
   ],
-  "releases": []
+  "releases": [
+    {
+      "id": "R1-mvp",
+      "status": "passed",
+      "updated_at": "2026-07-24T23:04:53.360427Z",
+      "updated_by": "releasing-a-version",
+      "gates": {
+        "security": true,
+        "smell": true,
+        "ux": null,
+        "coherence": true,
+        "stack_arch": true,
+        "integration": true
+      }
+    }
+  ]
 }
