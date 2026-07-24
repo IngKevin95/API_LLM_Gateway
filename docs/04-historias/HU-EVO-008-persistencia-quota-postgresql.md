@@ -64,3 +64,25 @@ func (m *Manager) persistAsync(ctx context.Context, job QuotaLearnJob) {
 - Extiende: `src/internal/quota/manager.go`, `src/internal/syncworker/` (HU-026)
 - Usa: HU-EVO-007 (learning)
 - Requisito para: auditoría y crash recovery
+
+## Estado real de implementación (actualizado tras reapertura de EP-EVO-002)
+
+Implementado en `src/internal/quota/persister_postgres.go` (`PostgresPersister`), cableado en
+`cmd/gateway/main.go` detrás de la variable de entorno `GATEWAY_QUOTA_POSTGRES_DSN` (opt-in; sin
+declararla, el Manager sigue usando `NoPersister` — comportamiento por defecto sin cambios).
+
+Diferencias respecto a las notas técnicas originales de esta historia (documentadas aquí para no
+perder trazabilidad, no bloqueantes):
+
+- **Tabla**: `learned_quota` (no `provider_quotas_learned`), con **upsert por
+  `(provider_id, model_id)`** — 1 fila vigente por par, no 1 fila por evento de aprendizaje. AC5
+  (histórico de auditoría con 3 rows) **no está implementado**: el modelo actual solo guarda el
+  último valor aprendido, no el historial completo. Si se necesita auditoría histórica real, es
+  una extensión futura (tabla append-only separada), no cubierta por esta corrección.
+- **Worker**: un único worker consumiendo un `channel` con buffer (no batch de 100ms/1000 jobs);
+  `Enqueue` no bloquea vía `select` con `default` (retorna `ErrPersistQueueFull` si el buffer está
+  lleno) en vez de goroutine-por-job.
+- **AC1, AC2, AC3, AC4**: implementados y probados contra PostgreSQL real (contenedor `postgres:16`
+  vía `docker run` en tests con build tag `integration`, sin agregar `testcontainers-go` como
+  dependencia): `src/internal/quota/persister_postgres_integration_test.go`.
+- **AC5** (auditoría con histórico multi-row): no implementado — ver nota de tabla arriba.

@@ -90,6 +90,6 @@ ejecución. Tras reabrir el slice, el estado real por escenario es:
   `TestRetireOn429_ExponentialBackoff`) topa en **120s**, no en 240s como dice la tabla de arriba.
   No bloqueante; deuda de spec/impl a conciliar en una revisión futura si se decide ajustar.
 
-**Diferido, no implementado**: la persistencia a PostgreSQL de la cuota aprendida (ver
-HU-EVO-008) sigue usando `NoPersister` (no-op) en producción. No es parte de los AC de esta
-historia, pero afecta la durabilidad del aprendizaje entre reinicios del gateway.
+**Actualización**: la persistencia a PostgreSQL de la cuota aprendida (ver HU-EVO-008) ya no está
+diferida — se implementó un `PostgresPersister` real, opt-in vía `GATEWAY_QUOTA_POSTGRES_DSN`. Ver
+el detalle en `HU-EVO-008-persistencia-quota-postgresql.md`.
