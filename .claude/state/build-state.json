@@ -32,7 +32,7 @@
     "gates": {
       "dor": true,
       "tdd": true,
-      "journey_smoke": false,
+      "journey_smoke": true,
       "coherence_link": true,
       "data": false,
       "api": false,
