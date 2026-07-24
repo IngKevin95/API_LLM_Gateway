@@ -1,0 +1,73 @@
+# free-tier.yaml — Catálogo de proveedores gratuitos curados (EP-EVO-001, HU-EVO-002).
+# Registry.MergeFreeTier() lo carga después de config.yaml; si un providerID
+# aparece en ambos, esta entrada gana (quota_hint más realista y curado).
+# Secretos siempre por referencia de entorno ${VAR}, nunca literales.
+
+providers:
+  - id: groq
+    type: generic
+    base_url: https://api.groq.com/openai/v1
+    api_key: ${GROQ_API_KEY}
+    max_in_flight: 100
+    models:
+      - name: mixtral-8x7b-32768
+        capabilities: [chat, coding]
+        quality_score: 85
+        latency_p50_ms: 300
+        cost_per_1m_tokens: 0
+    quota_hint: 14400 # 30 RPM * 24h * 20 días
+
+  - id: cerebras
+    type: generic
+    base_url: https://api.cerebras.ai/v1
+    api_key: ${CEREBRAS_API_KEY}
+    max_in_flight: 50
+    models:
+      - name: llama-3.3-70b
+        capabilities: [chat, reasoning]
+        quality_score: 88
+        latency_p50_ms: 250
+        cost_per_1m_tokens: 0
+    quota_hint: 14400
+
+  - id: mistral-free
+    type: generic
+    base_url: https://api.mistral.ai/v1
+    api_key: ${MISTRAL_API_KEY}
+    max_in_flight: 50
+    models:
+      - name: mistral-small-latest
+        capabilities: [chat]
+        quality_score: 80
+        latency_p50_ms: 400
+        cost_per_1m_tokens: 0
+    quota_hint: 500000000 # tokens/mes documentados
+
+  - id: gemini-free
+    type: generic
+    base_url: https://generativelanguage.googleapis.com/v1beta
+    api_key: ${GEMINI_API_KEY}
+    max_in_flight: 60
+    models:
+      - name: gemini-1.5-flash
+        capabilities: [chat, vision]
+        quality_score: 82
+        latency_p50_ms: 350
+        cost_per_1m_tokens: 0
+    quota_hint: 1500 # requests/día
+
+  - id: cloudflare-ai
+    type: generic
+    base_url: https://api.cloudflare.com/client/v4/accounts
+    api_key: ${CLOUDFLARE_AI_API_KEY}
+    max_in_flight: 40
+    models:
+      - name: llama-3.1-8b-instruct
+        capabilities: [chat]
+        quality_score: 70
+        latency_p50_ms: 500
+        cost_per_1m_tokens: 0
+    quota_hint: 10000 # neuronas/día free tier
+
+routing:
+  capabilities: {}
