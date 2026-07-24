@@ -35,6 +35,9 @@ type GatewayMetrics struct {
 	Providers     []ProviderStatus   `json:"providers"`
 	Latency       LatencyMetrics     `json:"latency"`
 	Models        []ModelMetric      `json:"models"`
+	// Quota (HU-EVO-005/EP-EVO-001) expone remaining por providerID, poblado en
+	// boot desde Registry.QuotaHints() vía Quota Manager, visible aun sin tráfico.
+	Quota         map[string]int     `json:"quota,omitempty"`
 }
 
 type ModelMetric struct {

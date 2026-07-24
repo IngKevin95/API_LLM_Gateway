@@ -20,6 +20,14 @@ func writeConfig(t *testing.T, body string) string {
 	return p
 }
 
+// writeFile escribe body en path (helper compartido con freetier_test.go).
+func writeFile(t *testing.T, path, body string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatalf("escribir fixture %s: %v", path, err)
+	}
+}
+
 const validYAML = `
 providers:
   - id: openai

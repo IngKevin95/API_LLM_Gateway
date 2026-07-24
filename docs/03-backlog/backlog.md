@@ -105,13 +105,32 @@
 | 56 | HU-058 | Debuguear y fijar handler Anthropic /v1/messages | EP-011 | Must | M | lista | 4 | HU-056 |
 | 57 | HU-059 | Implementar logging estructurado en todos los handlers | EP-011 | Should | M | lista | 5 | HU-050 |
 | 58 | HU-060 | Implementar /metrics con datos reales de operación | EP-011 | Should | M | lista | 4 | — |
+| 59 | HU-EVO-001 | Crear adapter genérico data-driven | EP-EVO-001 | Must | M | draft | 5 | — |
+| 60 | HU-EVO-002 | Cargar catálogo free-tier.yaml en Registry | EP-EVO-001 | Must | S | draft | 5 | HU-EVO-001 |
+| 61 | HU-EVO-003 | Extender conformance_test.go | EP-EVO-001 | Should | M | draft | 5 | HU-EVO-001/002 |
+| 62 | HU-EVO-004 | Health Monitor detecta 429 y retira proveedor | EP-EVO-001 | Should | M | draft | 5 | HU-EVO-001/002 |
+| 63 | HU-EVO-005 | Quota Manager inicializa contadores desde YAML | EP-EVO-001 | Should | S | draft | 5 | HU-EVO-002 |
+| 64 | HU-EVO-006 | Parsear headers X-RateLimit-* por adapter | EP-EVO-002 | Must | M | draft | 5 | HU-EVO-001 |
+| 65 | HU-EVO-007 | LearnFromHeaders() en Quota Manager con RAM | EP-EVO-002 | Must | M | draft | 5 | HU-EVO-006 |
+| 66 | HU-EVO-008 | Persistencia async en PostgreSQL de learned quotas | EP-EVO-002 | Should | M | draft | 5 | HU-EVO-007 |
+| 67 | HU-EVO-009 | Router penaliza score cuando remaining < 20% | EP-EVO-002 | Should | S | draft | 5 | HU-EVO-007 |
+| 68 | HU-EVO-010 | Manejo de 429 con reset timeout | EP-EVO-002 | Should | M | draft | 5 | HU-EVO-006/007 |
+| 69 | HU-EVO-011 | Metrics.Store quota snapshot | EP-EVO-003 | Must | M | draft | 5 | HU-EVO-007 |
+| 70 | HU-EVO-012 | Alert Manager cuota < umbral | EP-EVO-003 | Should | M | draft | 5 | HU-EVO-007 |
+| 71 | HU-EVO-013 | GET /alerts con filtrado RBAC | EP-EVO-003 | Should | M | draft | 5 | HU-EVO-012 |
+| 72 | HU-EVO-014 | UI React dashboard (Overview, Quotas, Alerts, Providers) | EP-EVO-003 | Must | L | draft | 7 | HU-EVO-011/012/013 |
+| 73 | HU-EVO-015 | Notificaciones browser cuando remaining < umbral | EP-EVO-003 | Should | M | draft | 5 | HU-EVO-014 |
 
-Total: 67 historias (47 Must / 15 Should / 5 Could).
+Total: 82 historias (51 Must / 23 Should / 8 Could).
 
 **Adiciones (2026-07-23)**:
 - EP-009 (4 HU): Sincronización asincronista y persistencia (HU-038-041)
 - EP-010 (7 HU): Compatibilidad universal clientes (HU-042-048) — en construcción
 - EP-011 (11 HU): MVP Fixes & Completeness (HU-050-060) — logging, debugging, OmniRoute, métricas
+- **CC-001 (15 HU-EVO)**: Proveedores gratuitos + aprendizaje de cuota + dashboard con alertas
+  - EP-EVO-001 (5 HU): Adapters gratuitos curados
+  - EP-EVO-002 (5 HU): Aprendizaje de cuota desde headers + persistencia
+  - EP-EVO-003 (5 HU): Dashboard ampliado + alertas por tenant + UI React
 
 ## Ideas sin desarrollar aún
 

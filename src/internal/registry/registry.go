@@ -3,6 +3,7 @@
 package registry
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -13,6 +14,11 @@ import (
 
 	"api-llm-gateway/internal/secrets"
 )
+
+// ErrInvalidConfig es el sentinel que envuelve cualquier fallo de parseo o
+// validación de un archivo de configuración adicional (ej. free-tier.yaml),
+// para fail-fast identificable con errors.Is (HU-EVO-002 AC3).
+var ErrInvalidConfig = errors.New("registry: config inválida")
 
 // envRef matchea una referencia a variable de entorno: ${NOMBRE}.
 var envRef = regexp.MustCompile(`^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$`)
@@ -39,6 +45,10 @@ type Provider struct {
 	APIKey      string  `yaml:"api_key"`
 	MaxInFlight int     `yaml:"max_in_flight"`
 	Models      []Model `yaml:"models"`
+
+	// QuotaHint es la cuota estimada inicial (HU-EVO-005); nil = ausente en YAML
+	// (el Quota Manager aplica su propio default). <=0 se trata como agotado.
+	QuotaHint *int `yaml:"quota_hint"`
 }
 
 // CapabilityRoute declara la cadena de providers de una capacidad.
@@ -179,6 +189,85 @@ func validate(raw rawConfig, path string) error {
 		}
 	}
 	return nil
+}
+
+// MergeFreeTier lee un archivo adicional de proveedores (ej.
+// config/providers/free-tier.yaml) y lo mergea sobre el catálogo ya cargado:
+// si un providerID existe en ambos, la entrada de este archivo gana
+// (HU-EVO-002 AC2). Falla fail-fast con ErrInvalidConfig ante YAML
+// malformado o campos obligatorios faltantes (AC3). Providers con
+// `models: []` vacío quedan cargados pero automáticamente excluidos del
+// scoring por ModelsFor (AC4, ya cubierto por hasCapability sobre lista vacía).
+func (r *Registry) MergeFreeTier(path string, sm secrets.Manager) error {
+	if sm == nil {
+		sm = r.sm
+	}
+	if sm == nil {
+		sm = secrets.NewEnvManager()
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("registry: leer %s: %w", path, err)
+	}
+
+	var raw rawConfig
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("registry: parsear %s: %w: %v", path, ErrInvalidConfig, err)
+	}
+	if err := validate(raw, path); err != nil {
+		return fmt.Errorf("%w: %v", ErrInvalidConfig, err)
+	}
+
+	var overwritten []string
+	for _, p := range raw.Providers {
+		if m := envRef.FindStringSubmatch(p.APIKey); m != nil {
+			val, err := sm.Resolve(p.APIKey)
+			if err != nil {
+				log.Printf("WARN registry: omitiendo provider %q (free-tier) por fallo de secretos: %v", p.ID, err)
+				continue
+			}
+			p.APIKey = val
+		}
+		for i := range p.Models {
+			p.Models[i].ProviderID = p.ID
+		}
+		if _, exists := r.providers[p.ID]; exists {
+			overwritten = append(overwritten, p.ID)
+		}
+		r.providers[p.ID] = p
+	}
+	if len(overwritten) > 0 {
+		log.Printf("INFO registry: providers sobrescritos por %s: %v", path, overwritten)
+	}
+
+	// Recalcula disponibilidad por capacidad tras el merge.
+	for cap := range r.routing {
+		ok := len(r.ModelsFor(cap)) > 0
+		r.available[cap] = ok
+		if !ok {
+			log.Printf("WARN registry: capacidad %q sin modelos habilitados, marcada no disponible", cap)
+		}
+	}
+	return nil
+}
+
+// Providers devuelve una copia del catálogo de proveedores cargado (orden no garantizado).
+func (r *Registry) Providers() []Provider {
+	out := make([]Provider, 0, len(r.providers))
+	for _, p := range r.providers {
+		out = append(out, p)
+	}
+	return out
+}
+
+// QuotaHints devuelve el quota_hint declarado por cada providerID (nil = ausente).
+func (r *Registry) QuotaHints() map[string]*int {
+	out := make(map[string]*int, len(r.providers))
+	for id, p := range r.providers {
+		out[id] = p.QuotaHint
+	}
+	return out
 }
 
 // MaxInFlight es el tope de peticiones concurrentes de un provider (Circuit Breaker).

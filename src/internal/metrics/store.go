@@ -25,6 +25,22 @@ type InMemoryStore struct {
 	maxSize   int
 	startIdx  int
 	startTime time.Time
+
+	// configuredProviders + quotaSnapshot (HU-EVO-005/EP-EVO-001): seteados en
+	// boot desde el Registry/Quota Manager, para que /metrics reporte
+	// proveedores y cuota aun sin tráfico previo (AC de journey_smoke).
+	configuredProviders []string
+	quotaSnapshot       map[string]int
+}
+
+// SetProviderSnapshot registra en boot los proveedores configurados y su cuota
+// remanente inicial (desde Quota Manager.InitFromRegistry), para que
+// GetGatewayMetrics los reporte incluso antes de la primera request.
+func (s *InMemoryStore) SetProviderSnapshot(providerIDs []string, quota map[string]int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.configuredProviders = append([]string(nil), providerIDs...)
+	s.quotaSnapshot = quota
 }
 
 // NewInMemoryStore crea un store con tamaño máximo (últimas N métricas).
@@ -112,17 +128,22 @@ func (s *InMemoryStore) GetMetrics(ctx context.Context, providerFilter string) (
 func (s *InMemoryStore) GetGatewayMetrics(ctx context.Context) (*GatewayMetrics, error) {
 	s.mu.RLock()
 	if len(s.metrics) == 0 {
+		providers := s.snapshotProviderStatusLocked()
+		quota := s.snapshotQuotaLocked()
 		s.mu.RUnlock()
 		return &GatewayMetrics{
 			UptimeSeconds: int(time.Since(s.startTime).Seconds()),
 			Requests:      RequestMetrics{ByHandler: make(map[string]int)},
-			Providers:     []ProviderStatus{},
+			Providers:     providers,
+			Quota:         quota,
 			Models:        []ModelMetric{},
 		}, nil
 	}
 	metricsCopy := make([]RequestMetric, len(s.metrics))
 	copy(metricsCopy, s.metrics)
 	startTime := s.startTime
+	configuredProviders := s.configuredProviders
+	quotaSnapshot := s.snapshotQuotaLocked()
 	s.mu.RUnlock()
 
 	// HU-060 AC2: uptime_seconds
@@ -141,6 +162,9 @@ func (s *InMemoryStore) GetGatewayMetrics(ctx context.Context) (*GatewayMetrics,
 		"/mcp":                 0,
 	}
 	providerSet := make(map[string]bool)
+	for _, id := range configuredProviders {
+		providerSet[id] = true
+	}
 
 	for _, m := range metricsCopy {
 		totalRequests++
@@ -194,9 +218,33 @@ func (s *InMemoryStore) GetGatewayMetrics(ctx context.Context) (*GatewayMetrics,
 			Errors:    errorCount,
 		},
 		Providers: providers,
+		Quota:     quotaSnapshot,
 		Latency:   latMetrics,
 		Models:    []ModelMetric{},
 	}, nil
+}
+
+// snapshotProviderStatusLocked construye la lista de ProviderStatus a partir
+// de configuredProviders; el llamador debe sostener s.mu (R o W).
+func (s *InMemoryStore) snapshotProviderStatusLocked() []ProviderStatus {
+	out := make([]ProviderStatus, 0, len(s.configuredProviders))
+	for _, id := range s.configuredProviders {
+		out = append(out, ProviderStatus{Name: id, Available: true})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
+// snapshotQuotaLocked copia el snapshot de cuota; el llamador debe sostener s.mu.
+func (s *InMemoryStore) snapshotQuotaLocked() map[string]int {
+	if s.quotaSnapshot == nil {
+		return nil
+	}
+	out := make(map[string]int, len(s.quotaSnapshot))
+	for k, v := range s.quotaSnapshot {
+		out[k] = v
+	}
+	return out
 }
 
 type aggregator struct {

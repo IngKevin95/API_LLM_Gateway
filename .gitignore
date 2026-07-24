@@ -267,10 +267,11 @@ docs/.arch-suggestions.md
 # ── /factory-arch-vertical ─────────────────────────────
 
 # ── factory-build-harness (auto) ───────────────────────
-.claude/state/*
+.claude/state/build-state.json
 # ── /factory-build-harness ──────────────────────
 
 # Go build artifacts
 *.exe
 
 /gateway
+src/gateway-bin

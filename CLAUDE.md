@@ -90,7 +90,7 @@ Los agentes **no consumen modelos, consumen capacidades**:
 
 **Ningún código de agente debe referenciar OpenAI/Anthropic/Google o un modelo concreto.**
 
-<!-- BEGIN factory-build-harness v0.9.0 -->
+<!-- BEGIN factory-build-harness v0.10.0 -->
 ## Arnés de construcción (Factory Build Harness)
 
 Este proyecto instaló `@factory/factory-spec-build`, el arnés que toma el trabajo de discovery
@@ -158,13 +158,13 @@ Reglas de nomenclatura que conviene memorizar:
 `security-reviewer`, `stack-guardian`, `data-consistency-checker`, `ux-krug-reviewer`,
 `simple-design-reviewer` y `ux-fidelity-reviewer`:
 
-- PRD técnico (de dónde sale el stack): docs/13-tech-prd/api-llm-gateway.md
-- Frontera de servicios externos / IA: Capa de Adapters — única frontera con proveedores LLM externos (OpenAI, Anthropic, Google Gemini, OpenRouter, AIHubMix, locales Ollama/vLLM/LM Studio). Todo I/O no determinista se aísla ahí; traducen System Prompts y Tool Calling unificadamente.
-- Qué lógica debe ser determinista (nada de IA ahí): Model Router (score heurístico de 6 variables: calidad, velocidad, disponibilidad, cuota, costo, latencia), Failover Engine (circuit breaker pasivo, TTFT/idle timeouts, cadena de fallback) y Auth/Rate Limiting (lookup O(1), cero I/O en el auth path crítico). Reproducible y en RAM.
-- Categorías de dato sensible / PII regulada: Prompts, Respuestas y Traza de Usuarios (pueden contener PII o IP del cliente). No se persisten en el AuditLog ni se exponen en stdout; la auditoría se restringe a metadata inmutable (tokens, tiempo, status, costo, usuario, agente, herramientas, cache hit).
-- Dónde viven los secretos server-side: API Keys maestras de LLMs, secretos JWT y credenciales KMS (endpoint/key_id). Jamás versionados en config.yaml ni volcados en errores/logs; se cargan solo desde env vars o Secret Manager.
-- Decisiones de alto impacto que necesitan explicabilidad en la UX: ADR-001 — Backend enteramente en Go (Golang) para throughput con overhead p95 < 100ms bajo alta concurrencia; adaptadores idiomáticos sin frameworks pesados de IA.
-- Fuente de diseño / referencia visual del proyecto: Fase 1 MVP sin UI (endpoint JSON /metrics). Dashboard React/Next es Fase 2 (aún no existe el prototipo — puntero no confirmado).
+- PRD técnico (de dónde sale el stack): {{PRD_TECH_PATH}}
+- Frontera de servicios externos / IA: {{EXTERNAL_SERVICE_LAYER}}
+- Qué lógica debe ser determinista (nada de IA ahí): {{DETERMINISTIC_LAYER}}
+- Categorías de dato sensible / PII regulada: {{SENSITIVE_DATA_CATEGORIES}}
+- Dónde viven los secretos server-side: {{SERVER_SIDE_SECRETS}}
+- Decisiones de alto impacto que necesitan explicabilidad en la UX: {{HIGH_STAKES_DECISIONS}}
+- Fuente de diseño / referencia visual del proyecto: {{DESIGN_SOURCE}}
 
 Si algún punto sigue mostrando `{{...}}`, todavía no corriste `/build:setup`.
 
