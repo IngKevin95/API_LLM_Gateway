@@ -2,48 +2,25 @@
   "last_completed_step": "done",
   "status": "completed",
   "failed_attempts": 0,
-  "change_id": "CC-001",
-  "description": "Proveedores gratuitos curados + Aprendizaje automático de cuota + Dashboard de alertas",
-  "timestamp": "2026-07-23T20:30:00Z",
-  "epicas_generadas": [
-    "EP-EVO-001",
-    "EP-EVO-002",
-    "EP-EVO-003"
-  ],
-  "historias_generadas": [
-    "HU-EVO-001",
-    "HU-EVO-002",
-    "HU-EVO-003",
-    "HU-EVO-004",
-    "HU-EVO-005",
-    "HU-EVO-006",
-    "HU-EVO-007",
-    "HU-EVO-008",
-    "HU-EVO-009",
-    "HU-EVO-010",
-    "HU-EVO-011",
-    "HU-EVO-012",
-    "HU-EVO-013",
-    "HU-EVO-014",
-    "HU-EVO-015"
-  ],
+  "change_id": "CC-002",
+  "description": "Fase 2: Persistencia en PostgreSQL, Caché Semántica con Vector DB, Learning Engine y Dashboard de Administración de Proveedores/Tokens",
+  "timestamp": "2026-07-24T19:47:10Z",
+  "epicas_generadas": ["EP-EVO-004", "EP-EVO-005"],
+  "historias_generadas": ["HU-EVO-016", "HU-EVO-017", "HU-EVO-018", "HU-EVO-019"],
   "artefactos_generados": {
     "epicas_evolutivas": "docs/03-backlog/epicas-evolutivas.md",
-    "historias": "docs/04-historias/HU-EVO-*.md (15 archivos)",
-    "backlog_actualizado": "docs/03-backlog/backlog.md",
-    "impacto_cambio": "docs/07-cambios/CC-001-proveedores-gratuitos-cuota-alertas.md",
-    "plan_construccion": "docs/07-cambios/PLAN-CC-001.md"
+    "historias": "docs/04-historias/HU-EVO-*.md (4 archivos)",
+    "impacto_cambio": "docs/07-cambios/CC-002-fase2-autonomia.md",
+    "plan_construccion": "docs/07-cambios/PLAN-CC-002.md"
   },
   "resumen_ejecutivo": {
-    "objetivo": "Ampliar gateway LLM con (1) adapters de ~20-25 proveedores gratuitos curados, (2) aprendizaje automático de cuota desde headers HTTP, (3) dashboard React con alertas por tenant",
-    "épicas_evolutivas": 3,
-    "historias_nuevas": 15,
-    "épicas_existentes_afectadas": 4,
-    "riesgo_global": "MEDIO — cambios acotados a adapters/quota/dashboard, no toca auth/failover core",
-    "estimacion_total": "21-24 días (3-4 semanas)",
-    "critical_path": "Slice 1 (6-7d) → Slice 2 (7-8d) → Slice 3 (8-9d)",
-    "paralelizable": false,
-    "dependencias_estrictas": "1→2→3 sin excepción"
+    "objetivo": "Transición de la plataforma MVP a Fase 2 (PostgreSQL asíncrono, caché semántica pgvector, y Dashboard Admin SSO).",
+    "épicas_evolutivas": 2,
+    "historias_nuevas": 4,
+    "riesgo_global": "ALTO — Mitigado mediante Locks atómicos, Colas Bounded en Sync Worker y Script de Bootstrap.",
+    "estimacion_total": "15 días",
+    "critical_path": "Slice 1 (5d) → Slice 2 (4d) → Slice 3 (6d)",
+    "paralelizable": true
   },
-  "próximo_paso": "Ejecutar /building-a-slice EP-EVO-001 para comenzar construcción de Adapter Genérico Data-Driven"
+  "próximo_paso": "Ejecutar /building-a-slice EP-EVO-004 para comenzar construcción del Slice 1"
 }
