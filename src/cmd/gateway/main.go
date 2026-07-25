@@ -249,12 +249,10 @@ func main() {
 	} else {
 		log.Printf("WARN gateway: GATEWAY_USERS_POSTGRES_DSN no configurado, /users deshabilitado")
 	}
-	registerUsersRoutes(mux, userStore, userKeys, os.Getenv("GATEWAY_ADMIN_TOKEN"))
 	jwtSecret := []byte(os.Getenv("GATEWAY_JWT_SECRET"))
 	if len(jwtSecret) == 0 {
 		jwtSecret = []byte("default-dev-secret-do-not-use-in-prod")
 	}
-	registerAuthRoutes(mux, userStore, sessionStore, os.Getenv("GATEWAY_ADMIN_TOKEN"), jwtSecret)
 
 	// identityMiddleware (HU-EVO-018): intenta resolver la identidad primero
 	// contra JWT local (Fase 4), luego userKeys (PostgreSQL), finalmente apiKeyStore (legacy).
@@ -299,6 +297,15 @@ func main() {
 			legacy.ServeHTTP(w, r)
 		})
 	}
+
+	// registerAuthRoutes se cablea recién ahora que identityMiddleware existe:
+	// /sessions y /auth/mfa/* dependen de auth.FromContext, que solo se
+	// popula si la ruta pasa por identityMiddleware (JWT local emitido por
+	// POST /auth/login, o userKeys/apiKeyStore legacy). Antes de este fix las
+	// rutas quedaban registradas sin ese wrap y devolvían 401 siempre
+	// (hueco de wiring detectado en EP-EVO-004-SS3, corregido acá).
+	registerAuthRoutes(mux, userStore, sessionStore, os.Getenv("GATEWAY_ADMIN_TOKEN"), jwtSecret, identityMiddleware)
+	registerUsersRoutes(mux, userStore, userKeys, os.Getenv("GATEWAY_ADMIN_TOKEN"), identityMiddleware)
 
 	// HU-060: /metrics endpoint con datos reales en memoria. Admin (token
 	// estático GATEWAY_ADMIN_TOKEN) ve todo sin filtrar; una identidad
@@ -480,12 +487,13 @@ func buildCapabilityLookup(reg *registry.Registry) func(provider, model string) 
 // registerUsersRoutes cablea /users, /users/{id} y /users/{id}/api-keys*
 // (HU-EVO-017/HU-EVO-018). Si userStore es nil (sin PostgreSQL configurada),
 // responde 503 a todas las rutas en vez de nil-pointer panic.
-func registerUsersRoutes(mux *http.ServeMux, userStore *user.Store, userKeys *user.KeyStore, adminToken string) {
+func registerUsersRoutes(mux *http.ServeMux, userStore *user.Store, userKeys *user.KeyStore, adminToken string, identity func(http.Handler) http.Handler) {
 	unavailable := func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, `{"error":"users store not configured"}`, http.StatusServiceUnavailable)
 	}
 	if userStore == nil || userKeys == nil {
 		mux.HandleFunc("/users", unavailable)
+		mux.HandleFunc("GET /users/me", unavailable)
 		mux.HandleFunc("PATCH /users/{id}", unavailable)
 		mux.HandleFunc("/users/{id}/api-keys", unavailable)
 		mux.HandleFunc("DELETE /users/{id}/api-keys/{keyId}", unavailable)
@@ -495,18 +503,53 @@ func registerUsersRoutes(mux *http.ServeMux, userStore *user.Store, userKeys *us
 	usersHandler := handler.NewUsersHandler(userStore)
 	apiKeysHandler := handler.NewAPIKeysHandler(userKeys)
 
+	// wrap prueba primero el token estatico GATEWAY_ADMIN_TOKEN (bypass total,
+	// no es una auth.Identity real y el legacy apikey.Middleware dentro de
+	// identity() lo rechazaria con 401 antes de llegar a resolveUserAuth);
+	// si no matchea, recien ahi pasa por identity() (JWT de sesion / API key
+	// / legacy) + resolveUserAuth.
 	wrap := func(h http.Handler) http.HandlerFunc {
-		return resolveUserAuth(adminToken, userKeys, userStore, h)
+		withAuth := identity(resolveUserAuth(adminToken, userStore, h))
+		return func(w http.ResponseWriter, r *http.Request) {
+			if adminToken != "" && r.Header.Get("Authorization") == "Bearer "+adminToken {
+				ac := handler.AdminContext{IsAdmin: true, GlobalAdmin: true}
+				h.ServeHTTP(w, handler.WithAdminContextValue(r, ac))
+				return
+			}
+			withAuth.ServeHTTP(w, r)
+		}
 	}
 
+	// GET /users/me (HU-EVO-022 AC1) requiere identityMiddleware, no
+	// resolveUserAuth: cualquier usuario autenticado (admin o no) resuelve su
+	// propio perfil vía auth.Identity, sin pasar por AdminContext. El token
+	// estático GATEWAY_ADMIN_TOKEN no es una fila real de `users` (no tiene
+	// Subject), así que no puede pasar por identity()+Me -- se sintetiza un
+	// perfil admin fijo para que el Dashboard (que usa este token como Bearer
+	// por defecto, ver EP-EVO-003) resuelva la tab "Team" igual que con un
+	// JWT de sesión real (hueco de wiring detectado por
+	// wiring-adversarial-verifier en EP-EVO-004-SS3: antes devolvia 401 y
+	// dejaba Team/Profile & Security vacíos para ese camino de auth).
+	meHandler := func(w http.ResponseWriter, r *http.Request) {
+		if adminToken != "" && r.Header.Get("Authorization") == "Bearer "+adminToken {
+			handler.WriteStaticAdminProfile(w)
+			return
+		}
+		identity(http.HandlerFunc(usersHandler.Me)).ServeHTTP(w, r)
+	}
+	mux.HandleFunc("GET /users/me", meHandler)
 	mux.HandleFunc("/users", wrap(usersHandler))
 	mux.HandleFunc("PATCH /users/{id}", wrap(http.HandlerFunc(usersHandler.PatchUser)))
 	mux.HandleFunc("/users/{id}/api-keys", wrap(apiKeysHandler))
 	mux.HandleFunc("DELETE /users/{id}/api-keys/{keyId}", wrap(http.HandlerFunc(apiKeysHandler.RevokeAPIKey)))
 }
 
-// registerAuthRoutes cablea /sessions, /auth/login y /auth/mfa*
-func registerAuthRoutes(mux *http.ServeMux, userStore *user.Store, sessionStore *user.SessionStore, adminToken string, jwtSecret []byte) {
+// registerAuthRoutes cablea /sessions, /auth/login y /auth/mfa*. identity
+// envuelve cada ruta protegida con identityMiddleware (JWT local o
+// userKeys/apiKeyStore legacy) para que auth.FromContext resuelva el
+// Subject -- sin este wrap las rutas devuelven 401 siempre (bug de wiring
+// corregido en EP-EVO-004-SS3, ver llamador en main()).
+func registerAuthRoutes(mux *http.ServeMux, userStore *user.Store, sessionStore *user.SessionStore, adminToken string, jwtSecret []byte, identity func(http.Handler) http.Handler) {
 	unavailable := func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, `{"error":"auth store not configured"}`, http.StatusServiceUnavailable)
 	}
@@ -523,15 +566,8 @@ func registerAuthRoutes(mux *http.ServeMux, userStore *user.Store, sessionStore 
 	mfaHandler := handler.NewMfaHandler(userStore)
 	authHandler := handler.NewAuthHandler(userStore, sessionStore, jwtSecret)
 
-	// Auth requires authenticated user (not just admin token).
-	// For simplicity in this wiring, we reuse resolveUserAuth or just assume identityMiddleware protects it.
-	// We'll wrap with resolveUserAuth which sets context, but it doesn't strictly block unauthenticated.
-	// Actually, identityMiddleware runs around the whole mux later. But the handler itself checks auth.FromContext!
 	wrap := func(h http.Handler) http.HandlerFunc {
-		// Just a dummy wrapper that relies on the global identityMiddleware
-		return func(w http.ResponseWriter, r *http.Request) {
-			h.ServeHTTP(w, r)
-		}
+		return identity(h).ServeHTTP
 	}
 
 	mux.HandleFunc("POST /auth/login", authHandler.Login)
@@ -542,26 +578,27 @@ func registerAuthRoutes(mux *http.ServeMux, userStore *user.Store, sessionStore 
 	mux.HandleFunc("/auth/mfa/disable", wrap(http.HandlerFunc(mfaHandler.Disable)))
 }
 
-// resolveUserAuth resuelve AdminContext + auth.Identity para el dominio de
-// usuarios: token estático GATEWAY_ADMIN_TOKEN = admin global; si no, intenta
-// autenticar la API key contra userKeys.Authenticate y, si el usuario
-// resuelto tiene role=admin, promueve a admin de su propio tenant (no
-// global). Delega el 401/403 final a cada handler (algunos endpoints son
-// admin-only, otros owner-or-admin).
-func resolveUserAuth(adminToken string, userKeys *user.KeyStore, userStore *user.Store, next http.Handler) http.HandlerFunc {
+// resolveUserAuth resuelve AdminContext para el dominio de usuarios: token
+// estático GATEWAY_ADMIN_TOKEN = admin global; si no, lee la auth.Identity ya
+// resuelta por identityMiddleware (JWT de sesión, API key o legacy -- las
+// tres vías quedan cubiertas porque este handler siempre se monta detrás de
+// identity()) y, si el usuario resuelto tiene role=admin, promueve a admin de
+// su propio tenant (no global). Antes de este fix solo reconocía API keys,
+// dejando 403 a cualquier admin autenticado por sesión JWT vía /auth/login
+// (hueco de wiring detectado en EP-EVO-004-SS3 al probar el journey real).
+// Delega el 401/403 final a cada handler (algunos endpoints son admin-only,
+// otros owner-or-admin).
+func resolveUserAuth(adminToken string, userStore *user.Store, next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		ac := handler.AdminContext{}
 
 		if adminToken != "" && r.Header.Get("Authorization") == "Bearer "+adminToken {
 			ac = handler.AdminContext{IsAdmin: true, GlobalAdmin: true}
-		} else if token := extractBearer(r); token != "" {
-			if id, ok := userKeys.Authenticate(ctx, token); ok {
-				ctx = auth.WithIdentity(ctx, id)
-				ac.Tenant = id.Tenant
-				if u, err := userStore.Get(ctx, id.Subject); err == nil && u.Role == user.RoleAdmin {
-					ac.IsAdmin = true
-				}
+		} else if id, ok := auth.FromContext(ctx); ok {
+			ac.Tenant = id.Tenant
+			if u, err := userStore.Get(ctx, id.Subject); err == nil && u.Role == user.RoleAdmin {
+				ac.IsAdmin = true
 			}
 		}
 

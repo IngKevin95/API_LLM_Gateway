@@ -40,3 +40,8 @@ Fuente de diseño: Stitch project `12981760791975432480`, pantalla `screens/67a1
 
 - Depende de: HU-EVO-018 (API keys), HU-EVO-019 (sesiones), HU-EVO-020 (2FA)
 - Integra: Dashboard React (HU-EVO-014), `authConfig.js` (HU-EVO-015)
+
+## Build harness — referencia cruzada
+
+Implementada en sub-slice `EP-EVO-004-SS3`, openspec change `team-roles-profile-security`
+(`openspec/changes/team-roles-profile-security/`), rama `feature/ep-evo-004-ss3-team-roles-profile-security`.

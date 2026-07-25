@@ -3,19 +3,33 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import useMetrics from './hooks/useMetrics';
 import useAlerts from './hooks/useAlerts';
+import useCurrentUser from './hooks/useCurrentUser';
 import Overview from './Overview';
 import Quotas from './Quotas';
 import Alerts from './Alerts';
 import Providers from './Providers';
+import TeamRoles from './TeamRoles';
+import ProfileSecurity from './ProfileSecurity';
 import SettingsModal from './SettingsModal';
 
-const TABS = ['Overview', 'Quotas', 'Alerts', 'Providers'];
+const BASE_TABS = ['Overview', 'Quotas', 'Alerts', 'Providers'];
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('Overview');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { metrics } = useMetrics();
   const { alerts } = useAlerts();
+  const { user: currentUser } = useCurrentUser();
+
+  // HU-EVO-021 AC4: "Team" solo se muestra si el usuario autenticado es
+  // admin -- el frontend no expone controles que el backend igual va a
+  // rechazar con 403. "Profile & Security" es visible para cualquier
+  // usuario autenticado (HU-EVO-022).
+  const TABS = [
+    ...BASE_TABS,
+    ...(currentUser?.role === 'admin' ? ['Team'] : []),
+    'Profile & Security',
+  ];
 
   return (
     <div className="gateway-ops-dark" data-testid="dashboard-root">
@@ -63,7 +77,7 @@ export default function Dashboard() {
             role="tab"
             aria-selected={activeTab === tab}
             className={activeTab === tab ? 'tab-active' : 'tab'}
-            data-testid={`tab-${tab.toLowerCase()}`}
+            data-testid={`tab-${tab.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
             onClick={() => setActiveTab(tab)}
           >
             {tab}
@@ -76,6 +90,8 @@ export default function Dashboard() {
         {activeTab === 'Quotas' && <Quotas metrics={metrics} />}
         {activeTab === 'Alerts' && <Alerts alerts={alerts} />}
         {activeTab === 'Providers' && <Providers metrics={metrics} />}
+        {activeTab === 'Team' && <TeamRoles />}
+        {activeTab === 'Profile & Security' && <ProfileSecurity />}
       </main>
 
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}

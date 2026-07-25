@@ -23,6 +23,15 @@ type UsersHandler struct {
 
 func NewUsersHandler(store *user.Store) *UsersHandler { return &UsersHandler{store: store} }
 
+// WriteStaticAdminProfile responde GET /users/me con un perfil admin
+// sintético para el token estático GATEWAY_ADMIN_TOKEN, que no es una fila
+// real de `users` (no tiene id/email propios). Permite que el Dashboard,
+// autenticado con ese token por defecto, resuelva la tab "Team" igual que un
+// admin logueado por sesión JWT.
+func WriteStaticAdminProfile(w http.ResponseWriter) {
+	writeJSON(w, http.StatusOK, &user.User{ID: "static-admin", Email: "admin (static token)", Role: user.RoleAdmin, Status: user.StatusActive})
+}
+
 // AdminContext lleva la información de autorización resuelta por el caller
 // (mismo patrón que handler.WithAdmin en alerts.go, pero con tenant propio y
 // distinción admin-global vs admin-de-tenant).
@@ -108,6 +117,24 @@ func (h *UsersHandler) list(w http.ResponseWriter, r *http.Request, ac AdminCont
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"data": users})
+}
+
+// Me implementa GET /users/me (HU-EVO-022 AC1): perfil del usuario
+// autenticado, resuelto desde auth.Identity (JWT local o userKeys), no desde
+// AdminContext -- cualquier usuario autenticado ve su propio perfil, sea o
+// no admin.
+func (h *UsersHandler) Me(w http.ResponseWriter, r *http.Request) {
+	id, ok := auth.FromContext(r.Context())
+	if !ok || id.Subject == "" {
+		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
+	u, err := h.store.Get(r.Context(), id.Subject)
+	if err != nil {
+		http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
+		return
+	}
+	writeJSON(w, http.StatusOK, u)
 }
 
 type patchUserRequest struct {

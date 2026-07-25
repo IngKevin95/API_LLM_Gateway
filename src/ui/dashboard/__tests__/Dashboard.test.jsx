@@ -18,13 +18,20 @@ const alertsPayload = {
   ],
 };
 
-function stubFetch() {
+function stubFetch(meRole) {
   return vi.fn((url) => {
     if (url === '/metrics') {
       return Promise.resolve({ ok: true, status: 200, json: async () => metricsPayload });
     }
     if (url === '/alerts') {
       return Promise.resolve({ ok: true, status: 200, json: async () => alertsPayload });
+    }
+    if (url === '/users/me' && meRole) {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: '1', email: 'u@t1.com', role: meRole }),
+      });
     }
     return Promise.resolve({ ok: false, status: 404, json: async () => ({}) });
   });
@@ -92,6 +99,31 @@ describe('Dashboard', () => {
 
     expect(screen.getByText('groq', { selector: '.provider-name' })).toBeInTheDocument();
     expect(screen.getByTestId('providers-tab').textContent).toContain('closed');
+  });
+
+  it('HU-EVO-021 AC4: rol operator no ve la tab Team, pero si Profile & Security', async () => {
+    global.fetch = stubFetch('operator');
+    render(<Dashboard />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByTestId('tab-team')).not.toBeInTheDocument();
+    expect(screen.getByTestId('tab-profile-security')).toBeInTheDocument();
+  });
+
+  it('HU-EVO-021: rol admin si ve la tab Team', async () => {
+    global.fetch = stubFetch('admin');
+    render(<Dashboard />);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId('tab-team')).toBeInTheDocument();
   });
 
   it('abre la modal de settings', async () => {

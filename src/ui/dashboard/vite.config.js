@@ -12,6 +12,9 @@ export default defineConfig({
     proxy: {
       '/metrics': process.env.GATEWAY_PROXY_TARGET || 'http://localhost:8080',
       '/alerts': process.env.GATEWAY_PROXY_TARGET || 'http://localhost:8080',
+      '/users': process.env.GATEWAY_PROXY_TARGET || 'http://localhost:8080',
+      '/auth/': process.env.GATEWAY_PROXY_TARGET || 'http://localhost:8080',
+      '/sessions': process.env.GATEWAY_PROXY_TARGET || 'http://localhost:8080',
     },
   },
   build: {
