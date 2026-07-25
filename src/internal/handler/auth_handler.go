@@ -88,6 +88,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		"tenant": foundUser.Tenant,
 		"sid":    sid,
 		"scopes": foundUser.Scopes,
+		"role":   string(foundUser.Role),
 		"exp":    time.Now().Add(24 * time.Hour).Unix(),
 	}
 

@@ -215,6 +215,14 @@ usuarios + API keys (HU-EVO-017/018, sin UI), después sesiones + 2FA
 una vez los endpoints existen y están probados. `security-reviewer` corre
 sobre esta épica antes de cualquier release que la incluya.
 
+### Build harness — referencia cruzada
+
+- `EP-EVO-004-SS1` (usuarios + API keys, sin UI) — openspec change `usuarios-postgresql-api-keys`, PR #48 mergeado.
+- `EP-EVO-004-SS2` (sesiones + 2FA, sin UI) — openspec change `sesiones-2fa-totp`, PR #49 mergeado.
+- `EP-EVO-004-SS3` (UI Team & Roles + Profile & Security, HU-EVO-021/022) — openspec change
+  `team-roles-profile-security` (`openspec/changes/team-roles-profile-security/`), rama
+  `feature/ep-evo-004-ss3-team-roles-profile-security`.
+
 ---
 
 ## Trazabilidad y Validación

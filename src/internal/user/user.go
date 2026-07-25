@@ -45,14 +45,15 @@ func (s Status) valid() bool {
 
 // User es una fila persistida en la tabla `users`.
 type User struct {
-	ID        string    `json:"id"`
-	Email     string    `json:"email"`
-	Role      Role      `json:"role"`
-	Status    Status    `json:"status"`
-	Tenant    string    `json:"tenant"`
-	Scopes    []string  `json:"scopes"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID         string    `json:"id"`
+	Email      string    `json:"email"`
+	Role       Role      `json:"role"`
+	Status     Status    `json:"status"`
+	Tenant     string    `json:"tenant"`
+	Scopes     []string  `json:"scopes"`
+	MfaEnabled bool      `json:"mfa_enabled"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 // Errores de dominio expuestos al handler HTTP para mapear a códigos.
@@ -181,8 +182,8 @@ func (s *Store) List(ctx context.Context, tenant string, globalAdmin bool) ([]Us
 func (s *Store) Get(ctx context.Context, id string) (*User, error) {
 	var u User
 	var role, status, scopes string
-	err := s.db.QueryRowContext(ctx, `SELECT id, email, role, status, tenant, scopes, created_at, updated_at FROM users WHERE id=$1`, id).
-		Scan(&u.ID, &u.Email, &role, &status, &u.Tenant, &scopes, &u.CreatedAt, &u.UpdatedAt)
+	err := s.db.QueryRowContext(ctx, `SELECT id, email, role, status, tenant, scopes, mfa_enabled, created_at, updated_at FROM users WHERE id=$1`, id).
+		Scan(&u.ID, &u.Email, &role, &status, &u.Tenant, &scopes, &u.MfaEnabled, &u.CreatedAt, &u.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}

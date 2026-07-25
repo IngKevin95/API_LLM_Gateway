@@ -275,3 +275,4 @@ docs/.arch-suggestions.md
 
 /gateway
 src/gateway-bin
+.playwright-mcp/

@@ -17,6 +17,7 @@ import (
 
 	_ "github.com/lib/pq"
 
+	"api-llm-gateway/internal/auth"
 	"api-llm-gateway/internal/user"
 )
 
@@ -246,6 +247,57 @@ func TestAPIKeysHTTP_Revoke_OtherUser_Returns403(t *testing.T) {
 	kh.RevokeAPIKey(w, delReq)
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("esperaba 403, obtuve %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// HU-EVO-022 AC1 / INT-usersme-identity: GET /users/me resuelve el perfil
+// del usuario autenticado a partir de auth.Identity (no de AdminContext) --
+// tanto admin como operator ven su propio perfil real desde PostgreSQL.
+func TestUsersHTTP_Me_ReturnsOwnProfile(t *testing.T) {
+	db := startTestPostgres(t)
+	defer db.Close()
+	store, err := user.NewStore(db)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	u, err := store.Create(context.Background(), "me@t1.com", user.RoleOperator, "t1", []string{"capability:chat"})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	h := NewUsersHandler(store)
+
+	req := httptest.NewRequest(http.MethodGet, "/users/me", nil)
+	req = req.WithContext(auth.WithIdentity(req.Context(), auth.Identity{Subject: u.ID, Tenant: "t1"}))
+	w := httptest.NewRecorder()
+	h.Me(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("esperaba 200, obtuve %d: %s", w.Code, w.Body.String())
+	}
+	var got user.User
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.Email != "me@t1.com" || got.ID != u.ID {
+		t.Fatalf("perfil incorrecto: %+v", got)
+	}
+}
+
+// HU-EVO-022: sin identidad resuelta en contexto, GET /users/me -> 401 (no
+// filtra ni asume un usuario por defecto).
+func TestUsersHTTP_Me_NoIdentity_Returns401(t *testing.T) {
+	db := startTestPostgres(t)
+	defer db.Close()
+	store, err := user.NewStore(db)
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	h := NewUsersHandler(store)
+
+	req := httptest.NewRequest(http.MethodGet, "/users/me", nil)
+	w := httptest.NewRecorder()
+	h.Me(w, req)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("esperaba 401, obtuve %d: %s", w.Code, w.Body.String())
 	}
 }
 
