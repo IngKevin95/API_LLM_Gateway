@@ -256,3 +256,30 @@ Opciones:
 - **Seguir** â†’ Genero HU-EVO por Ã©pica (15 historias con AC)
 - **Refinar** â†’ Cambios a los EP-EVO (scope, riesgo, dependencies)
 - **Corregir** â†’ Revisar algÃºn aspecto especÃ­fico
+
+---
+
+## EP-EVO-004
+
+titulo: Motores Core Fase 2 (PostgreSQL y pgvector)
+tipo: evolutivo
+extiende: [EP-009, EP-007]
+impacta: [HU-038, HU-032, HU-061, HU-062]
+riesgo: alto
+fecha_estimada: 2026-08-10
+
+**Descripción**: Migración de la validación in-memory a PostgreSQL mediante sync asíncrono, e implementación de Caché Semántica con la extensión pgvector nativa de Postgres.
+
+---
+
+## EP-EVO-005
+
+titulo: Gobernanza y Autonomía (Dashboard Admin y SSO)
+tipo: evolutivo
+extiende: [EP-004A, EP-013]
+impacta: [HU-065, HU-066, HU-067]
+riesgo: medio
+fecha_estimada: 2026-08-20
+
+**Descripción**: Implementación del UI administrativo protegido por SSO. Permite inyectar tokens de proveedores (KMS) y monitorear cuotas por modelo sin necesidad de despliegues.
+
